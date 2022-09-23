@@ -5,6 +5,11 @@ import talib
 
 
 def add_technical(df):
+    """
+    dfにテクニカル指標を追加する
+    :param df
+    :return ファクターを追加したdf
+    """
     # 実行時にdfに特徴量を追加することを防ぐため(メモリが使いましになる)
     df_c = df.copy()
 
@@ -873,9 +878,9 @@ def add_technical(df):
         num = np.array(range(window))
         num = np.sort(num)[::-1]
         zyuni = num - (np.argsort(np.argsort(x)[::-1]))
-        zyuni = zyuni ** 2
+        zyuni = zyuni**2
         goukei = zyuni.sum()
-        rci = (1 - (6 * goukei) / (window * (window ** 2 - 1))) * 100
+        rci = (1 - (6 * goukei) / (window * (window**2 - 1))) * 100
         return rci
 
     momentum_rci_span = [5, 10, 25, 50, 75]
