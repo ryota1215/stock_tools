@@ -1,0 +1,17 @@
+[flake8]
+max-line-length = 100
+extend-ignore =
+    # ref: https://black.readthedocs.io/en/stable/compatible_configs.html#flake8
+    # Line break occurred before a binary operator
+    W503,
+    # Whitespace before ':'
+    E203,
+    # Expected 2 blank lines, found 0
+    E302,
+    # Line too long
+    E501
+per-file-ignores =
+    # F401: Imported but unused
+    # E402: Module level import not at top of file
+    __init__.py: F401,
+    ./test/*: E402
