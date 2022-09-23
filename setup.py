@@ -7,4 +7,5 @@ setup(
     python_requires=">=3.6,<4.0",
     setup_requires=["setuptools_scm"],
     use_scm_version={"version_scheme": "python-simplified-semver"},
+    requires=["ta", "talib"],
 )
