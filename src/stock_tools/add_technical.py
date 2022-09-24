@@ -4,29 +4,37 @@ import ta
 import talib
 
 
-def add_technical(df):
+def add_technical(df, is_jpx: bool = False):
     """
     dfにテクニカル指標を追加する
     :param df
+    :param is_jpx dfがjpxのdataか否か
     :return ファクターを追加したdf
     """
     # 実行時にdfに特徴量を追加することを防ぐため(メモリが使いましになる)
     df_c = df.copy()
 
-    # 修正株価
-    bukatu_rate = np.cumprod(1 / df_c["adjustmentfactor"])
-    bukatu_rate = bukatu_rate / bukatu_rate.iloc[-1]
-    bukatu_rate = bukatu_rate.shift().fillna(method="bfill")
-    df_c["fix_open"] = df_c["open"] * bukatu_rate
-    df_c["fix_high"] = df_c["high"] * bukatu_rate
-    df_c["fix_low"] = df_c["low"] * bukatu_rate
-    df_c["fix_close"] = df_c["close"] * bukatu_rate
-    df_c["fix_volume"] = df_c["volume"] / bukatu_rate
-    open = df_c["fix_open"]
-    high = df_c["fix_high"]
-    low = df_c["fix_low"]
-    close = df_c["fix_close"]
-    volume = df_c["fix_volume"]
+    if is_jpx:
+        open = df_c["AdjustmentOpen"]
+        high = df_c["AdjustmentHigh"]
+        low = df_c["AdjustmentLow"]
+        close = df_c["AdjustmentClose"]
+        volume = df_c["AdjustmentVolume"]
+    else:
+        # 修正株価
+        bukatu_rate = np.cumprod(1 / df_c["adjustmentfactor"])
+        bukatu_rate = bukatu_rate / bukatu_rate.iloc[-1]
+        bukatu_rate = bukatu_rate.shift().fillna(method="bfill")
+        df_c["fix_open"] = df_c["open"] * bukatu_rate
+        df_c["fix_high"] = df_c["high"] * bukatu_rate
+        df_c["fix_low"] = df_c["low"] * bukatu_rate
+        df_c["fix_close"] = df_c["close"] * bukatu_rate
+        df_c["fix_volume"] = df_c["volume"] / bukatu_rate
+        open = df_c["fix_open"]
+        high = df_c["fix_high"]
+        low = df_c["fix_low"]
+        close = df_c["fix_close"]
+        volume = df_c["fix_volume"]
 
     # ラグ特徴量作成関数 lag_spanでラグ数設定
     def lag_make(column):
@@ -296,18 +304,18 @@ def add_technical(df):
     """
     trend_macd_span = [[19, 6], [26, 12], [39, 19]]
     for s, f in trend_macd_span:
-        df_c[f"trend_macd{s},{f}"] = ta.trend.MACD(
+        df_c[f"trend_macd{s}_{f}"] = ta.trend.MACD(
             close, window_slow=s, window_fast=f, window_sign=9, fillna=False
         ).macd()
-        lag_make(df_c[f"trend_macd{s},{f}"])
-        df_c[f"trend_macd_signal{s},{f}"] = ta.trend.MACD(
+        lag_make(df_c[f"trend_macd{s}_{f}"])
+        df_c[f"trend_macd_signal{s}_{f}"] = ta.trend.MACD(
             close, window_slow=s, window_fast=f, window_sign=9, fillna=False
         ).macd_signal()
-        lag_make(df_c[f"trend_macd_signal{s},{f}"])
-        df_c[f"trend_macd_diff{s},{f}"] = ta.trend.MACD(
+        lag_make(df_c[f"trend_macd_signal{s}_{f}"])
+        df_c[f"trend_macd_diff{s}_{f}"] = ta.trend.MACD(
             close, window_slow=s, window_fast=f, window_sign=9, fillna=False
         ).macd_diff()
-        lag_make(df_c[f"trend_macd_diff{s},{f}"])
+        lag_make(df_c[f"trend_macd_diff{s}_{f}"])
 
     # SMAIndicator カラムに入れる必要なしのためコメント化。
     # df_c["trand_sma25"] = ta.trend.sma_indicator(close, window=25, fillna=0)
@@ -351,10 +359,10 @@ def add_technical(df):
     """
     trend_mass_index_span = [[9, 25], [20, 50], [50, 150]]
     for f, s in trend_mass_index_span:
-        df_c[f"trend_mass_index{f},{s}"] = ta.trend.MassIndex(
+        df_c[f"trend_mass_index{f}_{s}"] = ta.trend.MassIndex(
             high, low, window_fast=f, window_slow=s, fillna=False
         ).mass_index()
-        lag_make(df_c[f"trend_mass_index{f},{s}"])
+        lag_make(df_c[f"trend_mass_index{f}_{s}"])
 
     # DPOIndicator
     """
@@ -762,8 +770,8 @@ def add_technical(df):
     fibo_span = [5, 10, 25, 50, 75]
     bairitsu = [0.382, 0.5, 0.618]
     for span in fibo_span:
-        df_c[f"max_{span}"] = df_c["fix_high"].rolling(window=span).max()
-        df_c[f"min_{span}"] = df_c["fix_low"].rolling(window=span).min()
+        df_c[f"max_{span}"] = high.rolling(window=span).max()
+        df_c[f"min_{span}"] = low.rolling(window=span).min()
         for b in bairitsu:
             df_c[f"others_fibo{span}_oshi{b}"] = df_c[f"max_{span}"] - (
                 (df_c[f"max_{span}"] - df_c[f"min_{span}"]) * b
@@ -797,7 +805,7 @@ def add_technical(df):
         df_c[f"others_psychological_{span}day"] = df_win_roll / span * 100
         lag_make(df_c[f"others_psychological_{span}day"])
 
-    # ボリュームレシオ
+    # # ボリュームレシオ
     """
     https://www.rakuten-sec.co.jp/MarketSpeed/onLineHelp/msman2_5_2_7.html
     """
@@ -805,16 +813,16 @@ def add_technical(df):
     for span in volume_vr_span:
         df_c["close_up"] = pd.Series(np.where(close.diff() > 0, volume, 0))
         up = df_c["close_up"].rolling(window=span, center=False).sum()
-        df_c["close_down"] = np.where(close.diff() < 0, df_c["volume"], 0)
+        df_c["close_down"] = np.where(close.diff() < 0, volume, 0)
         down = df_c["close_down"].rolling(window=span, center=False).sum()
-        df_c["close_stay"] = np.where(close.diff() == 0, df_c["volume"], 0)
+        df_c["close_stay"] = np.where(close.diff() == 0, volume, 0)
         stay = df_c["close_stay"].rolling(window=span, center=False).sum()
         drop_columns = ["close_up", "close_down", "close_stay"]
         df_c.drop(drop_columns, inplace=True, axis=1)
-        df_c[f"volume_vr1,{span}"] = (up + stay / 2) / (down + stay / 2) * 100
-        df_c[f"volume_vr2,{span}"] = (up + stay / 2) / (up + down + stay) * 100
-        lag_make(df_c[f"volume_vr1,{span}"])
-        lag_make(df_c[f"volume_vr2,{span}"])
+        df_c[f"volume_vr1_{span}"] = (up + stay / 2) / (down + stay / 2) * 100
+        df_c[f"volume_vr2_{span}"] = (up + stay / 2) / (up + down + stay) * 100
+        lag_make(df_c[f"volume_vr1_{span}"])
+        lag_make(df_c[f"volume_vr2_{span}"])
 
     # sonar
     """
