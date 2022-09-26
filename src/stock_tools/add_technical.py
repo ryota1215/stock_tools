@@ -3,6 +3,11 @@ import pandas as pd
 import ta
 import talib
 
+# すべての警告を削除
+import warnings
+
+warnings.simplefilter("ignore")
+
 
 def add_technical(df, is_jpx: bool = False):
     """
@@ -811,11 +816,11 @@ def add_technical(df, is_jpx: bool = False):
     """
     volume_vr_span = [5, 10, 25, 50, 75]
     for span in volume_vr_span:
-        df_c["close_up"] = pd.Series(np.where(close.diff() > 0, volume, 0))
+        df_c["close_up"] = pd.Series(np.where(close.diff() > 0, volume.values, 0))
         up = df_c["close_up"].rolling(window=span, center=False).sum()
-        df_c["close_down"] = np.where(close.diff() < 0, volume, 0)
+        df_c["close_down"] = np.where(close.diff() < 0, volume.values, 0)
         down = df_c["close_down"].rolling(window=span, center=False).sum()
-        df_c["close_stay"] = np.where(close.diff() == 0, volume, 0)
+        df_c["close_stay"] = np.where(close.diff() == 0, volume.values, 0)
         stay = df_c["close_stay"].rolling(window=span, center=False).sum()
         drop_columns = ["close_up", "close_down", "close_stay"]
         df_c.drop(drop_columns, inplace=True, axis=1)
@@ -946,19 +951,15 @@ def add_technical(df, is_jpx: bool = False):
         zero_max = np.zeros((len(aso_num)))  # 期間中の最大値空リスト
         zero_min = np.zeros((len(aso_num)))  # 期間中の最小値空リスト
         for i in range(len(aso_num)):  # 期間中の最大値リスト作成ループ
-            if i < (window3 - 1):  # window3の値未満だったらnanにする。
+            if (i < (window3 - 1)) | (aso_num[i] < 2):  # window3の値未満だったらnanにする。
                 zero_max[i] = np.nan
+                zero_min[i] = np.nan
             else:
                 x = close[i + 1 - aso_num[i] + 1 : i + 1]
                 # rolling日数分のclose値をスライスして取得。
-                zero_max[i] = np.nanmax(x)  # スライスして取得したリストの最大値取得。
-        for i in range(len(aso_num)):  # 期間中の最小値リスト作成ループ
-            if i < (window3 - 1):  # window3の値未満だったらnanにする。
-                zero_min[i] = np.nan
-            else:
-                x = close[i - aso_num[i] + 1 : i + 1]
-                # rolling日数分のclose値をスライスして取得。
-                zero_min[i] = np.nanmin(x)  # スライスして取得したリストの最小値取得。
+                zero_max[i] = np.nanmax(x)
+                zero_min[i] = np.nanmin(x)
+
         aso = (close - zero_min) / (zero_max - zero_min) * 100
         aso = aso.values
         aso = np.nan_to_num(aso)  # 欠損値を0に変更する。
