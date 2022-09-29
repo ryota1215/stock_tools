@@ -1189,3 +1189,6 @@ def add_technical(df, is_jpx: bool = False):
         df_c[f"momentum_lagrsi{gamma}"] = cu3 / (cu3 + cd3) * 100
         lag_make(df_c[f"momentum_lagrsi{gamma}"])
     return df_c
+
+
+# issue_7 pull request 練習中コメント
