@@ -54,7 +54,8 @@ def add_technical(df, is_jpx: bool = False):
         for span in lag_span:
             df_c[f"{column.name}_lag{span}"] = column.shift(span)
 
-    # momentum_ ここから機能まとめ！
+
+def momentums(df, is_jpx: bool = False):
     # RSIIndicator
     momentum_rsi_span = [5, 10, 25, 50, 75]
     for span in momentum_rsi_span:
@@ -440,7 +441,8 @@ def add_technical(df, is_jpx: bool = False):
         df_c[f"momentum_lagrsi{gamma}"] = cu3 / (cu3 + cd3) * 100
         lag_make(df_c[f"momentum_lagrsi{gamma}"])
 
-    # trend_ ここから機能まとめ！
+
+def trends(df, is_jpx: bool = False):
     # MACD
     """
     window_slowとwindow_fastの値は以下参照。
@@ -734,7 +736,9 @@ def add_technical(df, is_jpx: bool = False):
         dmn_num = pd.Series(dmn_num)
         dmp_roll = dmp_num.rolling(window).sum()
         dmn_roll = dmn_num.rolling(window).sum()
-        tr_roll = df_c["volatility_tr"].rolling(window).sum()
+        close_shift = close.shift(1)
+        volatility_tr = ta.utils.IndicatorMixin()._true_range(high, low, close_shift)
+        tr_roll = volatility_tr.rolling(window).sum()
         df_c[f"trend_dmi_dip{window}"] = dmp_roll / tr_roll * 100
         df_c[f"trend_dmi_din{window}"] = dmn_roll / tr_roll * 100
         sig = (
@@ -764,7 +768,18 @@ def add_technical(df, is_jpx: bool = False):
         df_c[f"trend_dem{window}"] = 100 * demax / (demax + demin)
         lag_make(df_c[f"trend_dem{window}"])
 
-    # volatility_ ここから機能まとめ！
+
+def volatilities(df, is_jpx: bool = False):
+    # volatility_tr
+    close_shift = close.shift(1)
+    df_c["volatility_tr"] = ta.utils.IndicatorMixin()._true_range(
+        high, low, close_shift
+    )
+
+    # volatility_tr_st
+    df_c["volatility_tr_st"] = df_c["volatility_tr"] / close
+    lag_make(df_c["volatility_tr_st"])
+
     # BollingerBands
     bb_span = [5, 10, 25, 50, 75]
     bb_dev = 2
@@ -883,16 +898,6 @@ def add_technical(df, is_jpx: bool = False):
         df_c[f"volatility_atr_st{span}"] = st
         lag_make(df_c[f"volatility_atr_st{span}"])
 
-    # volatility_tr
-    close_shift = close.shift(1)
-    df_c["volatility_tr"] = ta.utils.IndicatorMixin()._true_range(
-        high, low, close_shift
-    )
-
-    # volatility_tr_st
-    df_c["volatility_tr_st"] = df_c["volatility_tr"] / close
-    lag_make(df_c["volatility_tr_st"])
-
     # volatility_ui
     volatility_ui_span = [5, 10, 14, 25, 50, 75]
     """
@@ -933,7 +938,8 @@ def add_technical(df, is_jpx: bool = False):
     df_c["volatility_hv"] = hv
     lag_make(df_c["volatility_hv"])
 
-    # volume_ ここから機能まとめ！
+
+def volumes(df, is_jpx: bool = False):
     # ta volume_adi
     df_c["volume_adi"] = ta.volume.AccDistIndexIndicator(
         high, low, close, volume, fillna=False
@@ -1095,8 +1101,8 @@ def add_technical(df, is_jpx: bool = False):
         df_c[f"volume_vzo{window}"] = vp / tv * 100
         lag_make(df_c[f"volume_vzo{window}"])
 
-    # others_ ここから機能まとめ！
 
+def others(df, is_jpx: bool = False):
     # 移動平均カラム作成
     others_ma_span = [5, 10, 25, 50, 75]
     for span in others_ma_span:
