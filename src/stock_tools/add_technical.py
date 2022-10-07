@@ -48,14 +48,20 @@ def add_technical(df, is_jpx: bool = False):
     # 寄り騰落率
     df_c["oc_change"] = close / open - 1
 
+def lag_make(df:pd.DataFrame,serries_column:pd.Series,lag_span:np.array=np.arange(1,11)):
+    """
     # ラグ特徴量作成関数 lag_spanでラグ数設定
-    def lag_make(column):
-        lag_span = [1, 5]
-        for span in lag_span:
-            df_c[f"{column.name}_lag{span}"] = column.shift(span)
+    :param df 株価のdataframe
+    :param serries_column ラグ特徴量を生成したいcolumnのSerries
+    :param lag_span ラグ数のarray 初期 1~10
+    :return ファクターを追加したdf
+    """
+    for span in lag_span:
+        df[f"{serries_column.name}_lag{span}"] = serries_column.shift(span)
+    return df
 
-
-def momentums(df, is_jpx: bool = False):
+def momentums(df,open,high,low,close,volume):
+    df_c = df.copy()
     # RSIIndicator
     momentum_rsi_span = [5, 10, 25, 50, 75]
     for span in momentum_rsi_span:
@@ -442,7 +448,8 @@ def momentums(df, is_jpx: bool = False):
         lag_make(df_c[f"momentum_lagrsi{gamma}"])
 
 
-def trends(df, is_jpx: bool = False):
+def trends(df,open,high,low,close,volume):
+    df_c = df.copy()
     # MACD
     """
     window_slowとwindow_fastの値は以下参照。
@@ -769,7 +776,8 @@ def trends(df, is_jpx: bool = False):
         lag_make(df_c[f"trend_dem{window}"])
 
 
-def volatilities(df, is_jpx: bool = False):
+def volatilities(df,open,high,low,close,volume):
+    df_c = df.copy()
     # volatility_tr
     close_shift = close.shift(1)
     df_c["volatility_tr"] = ta.utils.IndicatorMixin()._true_range(
@@ -939,7 +947,8 @@ def volatilities(df, is_jpx: bool = False):
     lag_make(df_c["volatility_hv"])
 
 
-def volumes(df, is_jpx: bool = False):
+def volumes(df,open,high,low,close,volume):
+    df_c = df.copy()
     # ta volume_adi
     df_c["volume_adi"] = ta.volume.AccDistIndexIndicator(
         high, low, close, volume, fillna=False
@@ -1102,7 +1111,8 @@ def volumes(df, is_jpx: bool = False):
         lag_make(df_c[f"volume_vzo{window}"])
 
 
-def others(df, is_jpx: bool = False):
+def others(df,open,high,low,close,volume):
+    df_c = df.copy()
     # 移動平均カラム作成
     others_ma_span = [5, 10, 25, 50, 75]
     for span in others_ma_span:
