@@ -48,7 +48,8 @@ def add_technical(df, is_jpx: bool = False):
     # 寄り騰落率
     df_c["oc_change"] = close / open - 1
 
-def lag_make(df:pd.DataFrame,serries_column:pd.Series,lag_span:np.array=np.arange(1,11)):
+
+def lag_make(df, serries_column, lag_span):
     """
     # ラグ特徴量作成関数 lag_spanでラグ数設定
     :param df 株価のdataframe
@@ -60,7 +61,8 @@ def lag_make(df:pd.DataFrame,serries_column:pd.Series,lag_span:np.array=np.arang
         df[f"{serries_column.name}_lag{span}"] = serries_column.shift(span)
     return df
 
-def momentums(df,open,high,low,close,volume):
+
+def momentums(df, open, high, low, close, volume):
     df_c = df.copy()
     # RSIIndicator
     momentum_rsi_span = [5, 10, 25, 50, 75]
@@ -304,7 +306,7 @@ def momentums(df,open,high,low,close,volume):
                 zero_max[i] = np.nan
                 zero_min[i] = np.nan
             else:
-                x = close[i + 1 - aso_num[i] + 1 : i + 1]
+                x = close[i + 1 - aso_num[i] + 1: i + 1]
                 # rolling日数分のclose値をスライスして取得。
                 zero_max[i] = np.nanmax(x)
                 zero_min[i] = np.nanmin(x)
@@ -448,7 +450,7 @@ def momentums(df,open,high,low,close,volume):
         lag_make(df_c[f"momentum_lagrsi{gamma}"])
 
 
-def trends(df,open,high,low,close,volume):
+def trends(df, open, high, low, close, volume):
     df_c = df.copy()
     # MACD
     """
@@ -776,7 +778,7 @@ def trends(df,open,high,low,close,volume):
         lag_make(df_c[f"trend_dem{window}"])
 
 
-def volatilities(df,open,high,low,close,volume):
+def volatilities(df, open, high, low, close, volume):
     df_c = df.copy()
     # volatility_tr
     close_shift = close.shift(1)
@@ -947,7 +949,7 @@ def volatilities(df,open,high,low,close,volume):
     lag_make(df_c["volatility_hv"])
 
 
-def volumes(df,open,high,low,close,volume):
+def volumes(df, open, high, low, close, volume):
     df_c = df.copy()
     # ta volume_adi
     df_c["volume_adi"] = ta.volume.AccDistIndexIndicator(
@@ -1111,7 +1113,7 @@ def volumes(df,open,high,low,close,volume):
         lag_make(df_c[f"volume_vzo{window}"])
 
 
-def others(df,open,high,low,close,volume):
+def others(df, open, high, low, close, volume):
     df_c = df.copy()
     # 移動平均カラム作成
     others_ma_span = [5, 10, 25, 50, 75]
