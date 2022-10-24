@@ -87,7 +87,8 @@ class add_technical:
         momentum_rsi_span = [5, 10, 25, 50, 75]
         for span in momentum_rsi_span:
             df_c[f"momentum_rsi{span}"] = ta.momentum.RSIIndicator(
-                close, window=span, fillna=False).rsi()
+                close, window=span, fillna=False
+            ).rsi()
             self.lag_make(df_c, df_c[f"momentum_rsi{span}"])
 
         # StochRSIIndicator
@@ -324,7 +325,7 @@ class add_technical:
                     zero_max[i] = np.nan
                     zero_min[i] = np.nan
                 else:
-                    x = close[i + 1 - aso_num[i] + 1: i + 1]
+                    x = close[i + 1 - aso_num[i] + 1 : i + 1]
                     # rolling日数分のclose値をスライスして取得。
                     zero_max[i] = np.nanmax(x)
                     zero_min[i] = np.nanmin(x)
@@ -770,7 +771,9 @@ class add_technical:
             dmp_roll = dmp_num.rolling(window).sum()
             dmn_roll = dmn_num.rolling(window).sum()
             close_shift = close.shift(1)
-            volatility_tr = ta.utils.IndicatorMixin()._true_range(high, low, close_shift)
+            volatility_tr = ta.utils.IndicatorMixin()._true_range(
+                high, low, close_shift
+            )
             tr_roll = volatility_tr.rolling(window).sum()
             df_c[f"trend_dmi_dip{window}"] = dmp_roll / tr_roll * 100
             df_c[f"trend_dmi_din{window}"] = dmn_roll / tr_roll * 100
@@ -804,6 +807,33 @@ class add_technical:
         new_columns = df_c.columns
         self.columns_trand = np.setdiff1d(new_columns, old_columns)
 
+        # TDsequential
+        """
+        tradingviewのglazによるTD Sequential参考に作成
+        """
+        cc_diff = close.values - close.shift(4).values
+        up = np.where(cc_diff > 0, 1, 0)
+        down = np.where(cc_diff < 0, -1, 0)
+        up_count = np.zeros(len(down))
+        down_count = np.zeros(len(down))
+        for i in range(len(down)):
+            if up[i] == 0:
+                up_count[i] = 0
+            else:
+                up_count[i] = up_count[i - 1] + up[i]
+            if down[i] == 0:
+                down_count[i] = 0
+            else:
+                down_count[i] = down_count[i - 1] + down[i]
+        updown_count = up_count + down_count
+        df_c["trend_tdseq_updown"] = updown_count
+        sell_signal = np.where(updown_count == 9, 1, 0)
+        buy_signal = np.where(updown_count == -9, 1, 0)
+        df_c["trend_tdseq_sellsig"] = sell_signal
+        df_c["trend_tdseq_buysig"] = buy_signal
+        self.lag_make(df_c, df_c["trend_tdseq_updown"])
+        self.lag_make(df_c, df_c["trend_tdseq_sellsig"])
+        self.lag_make(df_c, df_c["trend_tdseq_buysig"])
         return df_c
 
     def volatilities(self, df, open, high, low, close, volume):
