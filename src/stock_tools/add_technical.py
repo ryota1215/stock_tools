@@ -20,11 +20,11 @@ class add_technical:
         df_c = df.copy()
 
         if is_jpx:
-            open = df_c["AdjustmentOpen"]
-            high = df_c["AdjustmentHigh"]
-            low = df_c["AdjustmentLow"]
-            close = df_c["AdjustmentClose"]
-            volume = df_c["AdjustmentVolume"]
+            self.open = df_c["AdjustmentOpen"]
+            self.high = df_c["AdjustmentHigh"]
+            self.low = df_c["AdjustmentLow"]
+            self.close = df_c["AdjustmentClose"]
+            self.volume = df_c["AdjustmentVolume"]
         else:
             # 修正株価
             bukatu_rate = np.cumprod(1 / df_c["adjustmentfactor"])
@@ -35,22 +35,40 @@ class add_technical:
             df_c["fix_low"] = df_c["low"] * bukatu_rate
             df_c["fix_close"] = df_c["close"] * bukatu_rate
             df_c["fix_volume"] = df_c["volume"] / bukatu_rate
-            open = df_c["fix_open"]
-            high = df_c["fix_high"]
-            low = df_c["fix_low"]
-            close = df_c["fix_close"]
+            self.open = df_c["fix_open"]
+            self.high = df_c["fix_high"]
+            self.low = df_c["fix_low"]
+            self.close = df_c["fix_close"]
+            self.volume = df_c["fix_volume"]
 
-        # 直近の騰落率ファクター追加
-        df_c = self.pricechange(df_c, open, close)
+        df_c = pd.concat(
+            [
+                # 直近の騰落率ファクター追加
+                self.pricechange(df_c, self.open, self.close),
+                # 各ファクター追加
+                self.momentums(
+                    df_c, self.open, self.high, self.low, self.close, self.volume
+                ),
+                self.trends(
+                    df_c, self.open, self.high, self.low, self.close, self.volume
+                ),
+                self.volatilities(
+                    df_c, self.open, self.high, self.low, self.close, self.volume
+                ),
+                self.volumes(
+                    df_c, self.open, self.high, self.low, self.close, self.volume
+                ),
+                self.others(
+                    df_c, self.open, self.high, self.low, self.close, self.volume
+                ),
+            ],
+            axis=1,
+        )
+        # 重複カラムの削除
+        self.df = df_c.T.drop_duplicates().T
 
-        # 各ファクター追加
-        df_c = self.momentums(df, open, high, low, close, volume)
-        df_c = self.trends(df, open, high, low, close, volume)
-        df_c = self.volatilities(df, open, high, low, close, volume)
-        df_c = self.volumes(df, open, high, low, close, volume)
-        df_c = self.others(df, open, high, low, close, volume)
-
-        return df_c
+    def get_df_technical(self):
+        return self.df
 
     def pricechange(self, df, open, close):
         """
@@ -65,7 +83,7 @@ class add_technical:
         df_c["cc_change"] = close.pct_change()
         df_c["cc_change"].iloc[0] = 0
         df_c["gap"] = open / close.shift() - 1
-        return df
+        return df_c
 
     def lag_make(self, df, serries_column, lag_span=np.arange(1, 11)):
         """
