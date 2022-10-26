@@ -20,11 +20,11 @@ class add_technical:
         df_c = df.copy()
 
         if is_jpx:
-            open = df_c["AdjustmentOpen"]
-            high = df_c["AdjustmentHigh"]
-            low = df_c["AdjustmentLow"]
-            close = df_c["AdjustmentClose"]
-            volume = df_c["AdjustmentVolume"]
+            self.open = df_c["AdjustmentOpen"]
+            self.high = df_c["AdjustmentHigh"]
+            self.low = df_c["AdjustmentLow"]
+            self.close = df_c["AdjustmentClose"]
+            self.volume = df_c["AdjustmentVolume"]
         else:
             # 修正株価
             bukatu_rate = np.cumprod(1 / df_c["adjustmentfactor"])
@@ -35,22 +35,40 @@ class add_technical:
             df_c["fix_low"] = df_c["low"] * bukatu_rate
             df_c["fix_close"] = df_c["close"] * bukatu_rate
             df_c["fix_volume"] = df_c["volume"] / bukatu_rate
-            open = df_c["fix_open"]
-            high = df_c["fix_high"]
-            low = df_c["fix_low"]
-            close = df_c["fix_close"]
+            self.open = df_c["fix_open"]
+            self.high = df_c["fix_high"]
+            self.low = df_c["fix_low"]
+            self.close = df_c["fix_close"]
+            self.volume = df_c["fix_volume"]
 
-        # 直近の騰落率ファクター追加
-        df_c = self.pricechange(df_c, open, close)
+        df_c = pd.concat(
+            [
+                # 直近の騰落率ファクター追加
+                self.pricechange(df_c, self.open, self.close),
+                # 各ファクター追加
+                self.momentums(
+                    df_c, self.open, self.high, self.low, self.close, self.volume
+                ),
+                self.trends(
+                    df_c, self.open, self.high, self.low, self.close, self.volume
+                ),
+                self.volatilities(
+                    df_c, self.open, self.high, self.low, self.close, self.volume
+                ),
+                self.volumes(
+                    df_c, self.open, self.high, self.low, self.close, self.volume
+                ),
+                self.others(
+                    df_c, self.open, self.high, self.low, self.close, self.volume
+                ),
+            ],
+            axis=1,
+        )
+        # 重複カラムの削除
+        self.df = df_c.T.drop_duplicates().T
 
-        # 各ファクター追加
-        df_c = self.momentums(df, open, high, low, close, volume)
-        df_c = self.trends(df, open, high, low, close, volume)
-        df_c = self.volatilities(df, open, high, low, close, volume)
-        df_c = self.volumes(df, open, high, low, close, volume)
-        df_c = self.others(df, open, high, low, close, volume)
-
-        return df_c
+    def get_df_technical(self):
+        return self.df
 
     def pricechange(self, df, open, close):
         """
@@ -65,7 +83,7 @@ class add_technical:
         df_c["cc_change"] = close.pct_change()
         df_c["cc_change"].iloc[0] = 0
         df_c["gap"] = open / close.shift() - 1
-        return df
+        return df_c
 
     def lag_make(self, df, serries_column, lag_span=np.arange(1, 11)):
         """
@@ -87,7 +105,8 @@ class add_technical:
         momentum_rsi_span = [5, 10, 25, 50, 75]
         for span in momentum_rsi_span:
             df_c[f"momentum_rsi{span}"] = ta.momentum.RSIIndicator(
-                close, window=span, fillna=False).rsi()
+                close, window=span, fillna=False
+            ).rsi()
             self.lag_make(df_c, df_c[f"momentum_rsi{span}"])
 
         # StochRSIIndicator
@@ -324,7 +343,7 @@ class add_technical:
                     zero_max[i] = np.nan
                     zero_min[i] = np.nan
                 else:
-                    x = close[i + 1 - aso_num[i] + 1: i + 1]
+                    x = close[i + 1 - aso_num[i] + 1 : i + 1]
                     # rolling日数分のclose値をスライスして取得。
                     zero_max[i] = np.nanmax(x)
                     zero_min[i] = np.nanmin(x)
@@ -770,7 +789,9 @@ class add_technical:
             dmp_roll = dmp_num.rolling(window).sum()
             dmn_roll = dmn_num.rolling(window).sum()
             close_shift = close.shift(1)
-            volatility_tr = ta.utils.IndicatorMixin()._true_range(high, low, close_shift)
+            volatility_tr = ta.utils.IndicatorMixin()._true_range(
+                high, low, close_shift
+            )
             tr_roll = volatility_tr.rolling(window).sum()
             df_c[f"trend_dmi_dip{window}"] = dmp_roll / tr_roll * 100
             df_c[f"trend_dmi_din{window}"] = dmn_roll / tr_roll * 100
@@ -804,6 +825,33 @@ class add_technical:
         new_columns = df_c.columns
         self.columns_trand = np.setdiff1d(new_columns, old_columns)
 
+        # TDsequential
+        """
+        tradingviewのglazによるTD Sequential参考に作成
+        """
+        cc_diff = close.values - close.shift(4).values
+        up = np.where(cc_diff > 0, 1, 0)
+        down = np.where(cc_diff < 0, -1, 0)
+        up_count = np.zeros(len(down))
+        down_count = np.zeros(len(down))
+        for i in range(len(down)):
+            if up[i] == 0:
+                up_count[i] = 0
+            else:
+                up_count[i] = up_count[i - 1] + up[i]
+            if down[i] == 0:
+                down_count[i] = 0
+            else:
+                down_count[i] = down_count[i - 1] + down[i]
+        updown_count = up_count + down_count
+        df_c["trend_tdseq_updown"] = updown_count
+        sell_signal = np.where(updown_count == 9, 1, 0)
+        buy_signal = np.where(updown_count == -9, 1, 0)
+        df_c["trend_tdseq_sellsig"] = sell_signal
+        df_c["trend_tdseq_buysig"] = buy_signal
+        self.lag_make(df_c, df_c["trend_tdseq_updown"])
+        self.lag_make(df_c, df_c["trend_tdseq_sellsig"])
+        self.lag_make(df_c, df_c["trend_tdseq_buysig"])
         return df_c
 
     def volatilities(self, df, open, high, low, close, volume):
