@@ -5,10 +5,10 @@ from plotly.subplots import make_subplots
 
 """
 要件
-visualization.pyのclass visualizationをimportして  ok.
-4本値と指定(複数)のテクニカル指標を表示する<chart>
-オシレーター系は下段に図を追加する<chart>
-visualization(df,表示したいカラム名のリスト)でチャートを表示 <chart>
+visualization.pyのclass visualizationをimportして  #ok.
+4本値と指定(複数)のテクニカル指標を表示する<chart>  #ok.
+オシレーター系は下段に図を追加する<chart> #ok.
+visualization(df,表示したいカラム名のリスト)でチャートを表示 <chart> #ok.
 サンプル : https://ailog.site/2022/04/08/2022/0408/
 
 複数銘柄比較機能を追加する<pair_chart>
@@ -29,19 +29,21 @@ class visualization:
         """
         チャートとオシレーターを表示する
         :param df 株価のdataframe
-        :param technicalのcolumns_list 表示したいテクニカルのcolumn名のリスト 例："trend_dmi_dip10"
+        :param columns_list:list of str  表示したいテクニカルのcolumn名のリスト
         :return チャート
         """
-        column_name = columns_list  # columns_listに対してforでループするように後日変更する!
         # subplotsで複数のグラフ画面を作成する
+        heights_list = np.ones(1 + len(columns_list))  # row_heightsグラフ高さ倍率リストの作成
+        heights_list[0] = 3  # 一つ目のグラフとそれ以降の倍率を3：1にしている
+        heights_list = heights_list.tolist()  # list形式に変換
         fig = make_subplots(
-            rows=2,  # 行数設定
+            rows=1 + len(columns_list),  # 行数設定
             cols=1,  # 列数設定
             # shared_yaxes='all', #y軸を共有する
             shared_xaxes="all",  # x軸を共有する
             vertical_spacing=0.1,  # サブプロット行間のスペース
-            subplot_titles=("OHLC", f"{column_name}"),  # グラフ上のタイトル設定
-            row_heights=[5.0, 2.0],  # グラフの大きさ 相対的比率
+            subplot_titles=("OHLC", "column"),  # グラフ上のタイトル設定
+            row_heights=heights_list,  # グラフの大きさ 相対的比率
         )
         # add_traceでグラフを入れる
         fig.add_trace(
@@ -56,17 +58,17 @@ class visualization:
             row=1,
             col=1,
         )
-
-        fig.add_trace(
-            go.Scatter(
-                x=df["date"],
-                y=df[f"{column_name}"],
-                mode="lines",
-                name="オシレーター",
-            ),
-            row=2,
-            col=1,
-        )
+        for index, column_name in enumerate(columns_list):
+            fig.add_trace(
+                go.Scatter(
+                    x=df["date"],
+                    y=df[f"{column_name}"],
+                    mode="lines",
+                    name="オシレーター",
+                ),
+                row=index + 2,
+                col=1,
+            )
         # layoutでレイアウト設定をする
         fig.update_layout(
             # title_text='Time series with range slider',　# グラフタイトル
