@@ -25,24 +25,27 @@ class visualization:
     def __init__(self):
         """ """
 
-    def chart(self, df, columns_list):
+    def chart(self, df, technical_list=[], oscillator_list=[]):
         """
         チャートとオシレーターを表示する
         :param df 株価のdataframe
-        :param columns_list:list of str  表示したいテクニカルのcolumn名のリスト
+        :param technical_list:list of str  表示したいテクニカルのcolumnsリスト
+        :param oscillator_list:list of str  表示したいオシレーターのcolumnsリスト
         :return チャート
         """
         # subplotsで複数のグラフ画面を作成する
-        heights_list = np.ones(1 + len(columns_list))  # row_heightsグラフ高さ倍率リストの作成
+        heights_list = np.ones(1 + len(oscillator_list))  # row_heightsグラフ高さ倍率リストの作成
         heights_list[0] = 3  # 一つ目のグラフとそれ以降の倍率を3：1にしている
         heights_list = heights_list.tolist()  # list形式に変換
+        subtitle_name = oscillator_list.copy()
+        subtitle_name.insert(0, "OHLC")
         fig = make_subplots(
-            rows=1 + len(columns_list),  # 行数設定
+            rows=1 + len(oscillator_list),  # 行数設定
             cols=1,  # 列数設定
             # shared_yaxes='all', #y軸を共有する
             shared_xaxes="all",  # x軸を共有する
             vertical_spacing=0.1,  # サブプロット行間のスペース
-            subplot_titles=("OHLC", "column"),  # グラフ上のタイトル設定
+            subplot_titles=(subtitle_name),  # グラフ上のタイトル設定
             row_heights=heights_list,  # グラフの大きさ 相対的比率
         )
         # add_traceでグラフを入れる
@@ -58,27 +61,42 @@ class visualization:
             row=1,
             col=1,
         )
-        for index, column_name in enumerate(columns_list):
+        if len(technical_list) != 0:
+            for technical in technical_list:
+                fig.add_trace(
+                    go.Scatter(
+                        x=df["date"],
+                        y=df[f"{technical}"],
+                        mode="lines",
+                        name=f"{technical}",
+                    ),
+                    row=1,
+                    col=1,
+                )
+        for index, column_name in enumerate(oscillator_list):
             fig.add_trace(
                 go.Scatter(
                     x=df["date"],
                     y=df[f"{column_name}"],
                     mode="lines",
-                    name="オシレーター",
+                    name=f"{column_name}",
                 ),
                 row=index + 2,
                 col=1,
             )
         # layoutでレイアウト設定をする
         fig.update_layout(
-            # title_text='Time series with range slider',　# グラフタイトル
+            # グラフタイトル
+            # title_text="OHLC",
+            # 凡例表示
+            showlegend=True,
+            # 凡例の位置変更
             xaxis_rangeslider=dict(
                 visible=False,
             ),  # レンジスライダー削除
             yaxis=dict(fixedrange=False),  # y軸のズームを可能にする
-            showlegend=False,  # 凡例削除
-            # height=700, #グラフ高さの編集
-            # width=1000, #グラフ横幅の編集
+            height=700,  # グラフ高さの編集
+            width=1000,  # グラフ横幅の編集
         )
         # 土日祝の隙間を削除するためにrangebreaks作成して、update_xaxesで反映させる
         # 日付objectをdatetime型に変換
