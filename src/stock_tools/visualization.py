@@ -61,6 +61,7 @@ class visualization:
             row=1,
             col=1,
         )
+        # 引数にtechnical_listがあればグラフに表示
         if len(technical_list) != 0:
             for technical in technical_list:
                 fig.add_trace(
@@ -73,6 +74,7 @@ class visualization:
                     row=1,
                     col=1,
                 )
+        # 引数にoscillator_listがあればグラフを作成
         for index, column_name in enumerate(oscillator_list):
             fig.add_trace(
                 go.Scatter(
@@ -95,8 +97,8 @@ class visualization:
                 visible=False,
             ),  # レンジスライダー削除
             yaxis=dict(fixedrange=False),  # y軸のズームを可能にする
-            height=700,  # グラフ高さの編集
-            width=1000,  # グラフ横幅の編集
+            height=800,  # グラフ高さの編集
+            width=900,  # グラフ横幅の編集
         )
         # 土日祝の隙間を削除するためにrangebreaks作成して、update_xaxesで反映させる
         # 日付objectをdatetime型に変換
