@@ -33,21 +33,30 @@ class visualization:
         :param oscillator_list:list of str  表示したいオシレーターのcolumnsリスト
         :return チャート
         """
+        # jpxのdateカラムはDateのため変換
+        if "date" not in df.columns:
+            df = df.rename(
+                columns={f"Adjustment{c}": f"fix_{c.lower()}" for c in [
+                    "Open", "High", "Low", "Close"]}
+            )
+            df = df.rename(columns={"Date": "date","CODE":"Code"})
+        code = df["CODE"][0]
         # subplotsで複数のグラフ画面を作成する
-        heights_list = np.ones(1 + len(oscillator_list))  # row_heightsグラフ高さ倍率リストの作成
-        heights_list[0] = 3  # 一つ目のグラフとそれ以降の倍率を3：1にしている
-        heights_list = heights_list.tolist()  # list形式に変換
-        subtitle_name = oscillator_list.copy()
-        subtitle_name.insert(0, "OHLC")
-        fig = make_subplots(
-            rows=1 + len(oscillator_list),  # 行数設定
-            cols=1,  # 列数設定
-            # shared_yaxes='all', #y軸を共有する
-            shared_xaxes="all",  # x軸を共有する
-            vertical_spacing=0.1,  # サブプロット行間のスペース
-            subplot_titles=(subtitle_name),  # グラフ上のタイトル設定
-            row_heights=heights_list,  # グラフの大きさ 相対的比率
-        )
+        if len(oscillator_list) != 0:
+            heights_list = np.ones(1 + len(oscillator_list))  # row_heightsグラフ高さ倍率リストの作成
+            heights_list[0] = 3  # 一つ目のグラフとそれ以降の倍率を3：1にしている
+            heights_list = heights_list.tolist()  # list形式に変換
+            subtitle_name = oscillator_list.copy()
+            subtitle_name.insert(0, f"{code}")
+            fig = make_subplots(
+                rows=1 + len(oscillator_list),  # 行数設定
+                cols=1,  # 列数設定
+                # shared_yaxes='all', #y軸を共有する
+                shared_xaxes="all",  # x軸を共有する
+                vertical_spacing=0.1,  # サブプロット行間のスペース
+                subplot_titles=(subtitle_name),  # グラフ上のタイトル設定
+                row_heights=heights_list,  # グラフの大きさ 相対的比率
+            )
         # add_traceでグラフを入れる
         fig.add_trace(
             go.Candlestick(
