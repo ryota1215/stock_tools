@@ -320,7 +320,7 @@ class add_technical:
                     zero_max[i] = np.nan
                     zero_min[i] = np.nan
                 else:
-                    x = close[i + 1 - aso_num[i] + 1 : i + 1]
+                    x = close[i + 1 - aso_num[i] + 1: i + 1]
                     # rolling日数分のclose値をスライスして取得。
                     zero_max[i] = np.nanmax(x)
                     zero_min[i] = np.nanmin(x)
