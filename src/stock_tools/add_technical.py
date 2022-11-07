@@ -65,7 +65,7 @@ class add_technical:
             axis=1,
         )
         # 重複カラムの削除
-        self.df = df_c.T.drop_duplicates().T
+        self.df = df_c.T.groupby(level=0).last().T
 
     def get_df_technical(self):
         return self.df
