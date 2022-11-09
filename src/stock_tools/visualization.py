@@ -36,10 +36,12 @@ class visualization:
         # jpxのdateカラムはDateのため変換
         if "date" not in df.columns:
             df = df.rename(
-                columns={f"Adjustment{c}": f"fix_{c.lower()}" for c in [
-                    "Open", "High", "Low", "Close"]}
+                columns={
+                    f"Adjustment{c}": f"fix_{c.lower()}"
+                    for c in ["Open", "High", "Low", "Close"]
+                }
             )
-            df = df.rename(columns={"Date": "date","CODE":"Code"})
+            df = df.rename(columns={"Date": "date", "Code": "CODE"})
         code = df["CODE"][0]
         # subplotsで複数のグラフ画面を作成する
         if len(oscillator_list) != 0:
