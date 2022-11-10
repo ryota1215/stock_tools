@@ -2,10 +2,10 @@ import pandas as pd
 import requests
 import json
 import sys
+import os
 
-sys.path.append(
-    "c:\\Users\\xxp2p\\anaconda3\\envs\\yt_38\\lib\\site-packages\\stock_tools-0.0.1.dev34+ge1c79e5-py3.8.egg\\stock_tools\\"
-)
+# add_technicalのimport先である一つ上の階層のパスをsys.pathに追加
+sys.path.append(os.sep.join(sys.path[0].split(os.sep)[:-1]))
 import add_technical
 
 # リフレッシュトークン1週間に一度は取得。
