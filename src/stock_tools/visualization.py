@@ -123,8 +123,103 @@ class visualization:
         fig.update_xaxes(rangebreaks=[dict(values=d_breaks)])
         fig.show()
 
-    def pairchart(self, df1, df2, start_day, end_day):
+    def pairchart(self, df1, df2):
+        # 引数追加 , start_day, end_day
         """
         visualization.pairchart(df1,df2,スタート日付{"20200101"},エンド日付)
         これで出せるようにしてほしい
         """
+        """
+        ペアチャートを表示する
+        :param df1 株価のdataframe
+        :param df2 株価のdataframe
+        :param start_day{"20200101"} 表示期間の始まりの日
+        :param end_day{"20200101"} 表示期間の終わりの日
+        :return チャート
+        """
+        # jpxのdateカラムはDateのため変換
+        if "date" not in df1.columns:
+            df1 = df1.rename(
+                columns={
+                    f"Adjustment{c}": f"fix_{c.lower()}"
+                    for c in ["Open", "High", "Low", "Close"]
+                }
+            )
+            df1 = df1.rename(columns={"Date": "date", "Code": "CODE"})
+        if "date" not in df2.columns:
+            df2 = df2.rename(
+                columns={
+                    f"Adjustment{c}": f"fix_{c.lower()}"
+                    for c in ["Open", "High", "Low", "Close"]
+                }
+            )
+            df2 = df2.rename(columns={"Date": "date", "Code": "CODE"})
+
+        code1 = df1["CODE"][0]
+        code2 = df2["CODE"][0]
+        # subplotsで複数のグラフ画面を作成する
+        fig = make_subplots(
+            rows=2,  # 行数設定
+            cols=1,  # 列数設定
+            # shared_yaxes='all', #y軸を共有する
+            shared_xaxes="all",  # x軸を共有する
+            vertical_spacing=0.1,  # サブプロット行間のスペース
+            subplot_titles=("chart", "差分"),  # グラフ上のタイトル設定
+            row_heights=[3, 1],  # グラフの大きさ 相対的比率
+        )
+        # add_traceでグラフを入れる
+        fig.add_trace(
+            go.Scatter(
+                x=df1["date"],
+                y=df1["fix_close"],
+                mode="lines",
+                name=f"{code1}",
+            ),
+            row=1,
+            col=1,
+        )
+        fig.add_trace(
+            go.Scatter(
+                x=df2["date"],
+                y=df2["fix_open"],
+                mode="lines",
+                name=f"{code2}",
+            ),
+            row=1,
+            col=1,
+        )
+        fig.add_trace(
+            go.Scatter(
+                x=df1["date"],
+                y=df1["fix_close"] - df2["fix_open"],
+                mode="lines",
+                name="差分",
+            ),
+            row=2,
+            col=1,
+        )
+        # layoutでレイアウト設定をする
+        fig.update_layout(
+            # グラフタイトル
+            # title_text="OHLC",
+            # 凡例表示
+            showlegend=True,
+            # 凡例の位置変更
+            xaxis_rangeslider=dict(
+                visible=False,
+            ),  # レンジスライダー削除
+            yaxis=dict(fixedrange=False),  # y軸のズームを可能にする
+            height=800,  # グラフ高さの編集
+            width=900,  # グラフ横幅の編集
+        )
+        # 土日祝の隙間を削除するためにrangebreaks作成して、update_xaxesで反映させる
+        # 日付objectをdatetime型に変換
+        date = pd.to_datetime(df1["date"])
+        # 日付リストを取得
+        d_all = pd.date_range(start=df1["date"].iloc[0], end=df1["date"].iloc[-1])
+        # 株価データの日付リストを取得
+        d_obs = [d.strftime("%Y-%m-%d") for d in date]
+        # 株価データの日付データに含まれていない日付を抽出
+        d_breaks = [d for d in d_all.strftime("%Y-%m-%d").tolist() if not d in d_obs]
+        fig.update_xaxes(rangebreaks=[dict(values=d_breaks)])
+        fig.show()
