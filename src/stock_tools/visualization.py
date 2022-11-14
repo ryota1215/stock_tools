@@ -123,7 +123,7 @@ class visualization:
         fig.update_xaxes(rangebreaks=[dict(values=d_breaks)])
         fig.show()
 
-    def pairchart(self, df1, df2, start_day=0, end_day=99999999):
+    def pairchart(self, df1, df2, start_day=0, end_day=99999999, indexing=False):
         # 引数追加 , start_day, end_day
         """
         visualization.pairchart(df1,df2,スタート日付{"20200101"},エンド日付)
@@ -131,11 +131,12 @@ class visualization:
         """
         """
         ペアチャートを表示する
-        :param df1 株価のdataframe
-        :param df2 株価のdataframe
-        :param start_day{"20200101"} 表示期間の始まりの日
-        :param end_day{"20200101"} 表示期間の終わりの日
-        :return チャート
+        :param df1:df 基準とする株価のdataframe
+        :param df2:df 株価のdataframe
+        :param start_day:int (例20200101) 表示期間の始まりの日
+        :param end_day:int(例20200101) 表示期間の終わりの日
+        :param indexing:bool Trueなら100を基準とした終値指数化に変更,Falseは株価終値で表示
+        :return ペアチャート
         """
         # jpxのdateカラムはDateのため変換
         if "date" not in df1.columns:
@@ -158,6 +159,12 @@ class visualization:
         code2 = df2["CODE"][0]
         df1 = df1[(df1["date"] >= f"{start_day}") & (df1["date"] <= f"{end_day}")]
         df2 = df2[(df2["date"] >= f"{start_day}") & (df2["date"] <= f"{end_day}")]
+        if indexing == True:
+            df1 = df1.reset_index()
+            df1["fix_close"] = df1["fix_close"] / df1["fix_close"][0] * 100
+            df2 = df2.reset_index()
+            df2["fix_close"] = df2["fix_close"] / df2["fix_close"][0] * 100
+            print(df2["fix_close"])
         # subplotsで複数のグラフ画面を作成する
         fig = make_subplots(
             rows=2,  # 行数設定
