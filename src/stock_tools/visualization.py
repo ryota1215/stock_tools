@@ -123,7 +123,7 @@ class visualization:
         fig.update_xaxes(rangebreaks=[dict(values=d_breaks)])
         fig.show()
 
-    def pairchart(self, df1, df2):
+    def pairchart(self, df1, df2, start_day=0, end_day=99999999):
         # 引数追加 , start_day, end_day
         """
         visualization.pairchart(df1,df2,スタート日付{"20200101"},エンド日付)
@@ -154,9 +154,10 @@ class visualization:
                 }
             )
             df2 = df2.rename(columns={"Date": "date", "Code": "CODE"})
-
         code1 = df1["CODE"][0]
         code2 = df2["CODE"][0]
+        df1 = df1[(df1["date"] >= f"{start_day}") & (df1["date"] <= f"{end_day}")]
+        df2 = df2[(df2["date"] >= f"{start_day}") & (df2["date"] <= f"{end_day}")]
         # subplotsで複数のグラフ画面を作成する
         fig = make_subplots(
             rows=2,  # 行数設定
@@ -180,8 +181,8 @@ class visualization:
         )
         fig.add_trace(
             go.Scatter(
-                x=df2["date"],
-                y=df2["fix_open"],
+                x=df1["date"],
+                y=df2["fix_close"],
                 mode="lines",
                 name=f"{code2}",
             ),
@@ -191,7 +192,7 @@ class visualization:
         fig.add_trace(
             go.Scatter(
                 x=df1["date"],
-                y=df1["fix_close"] - df2["fix_open"],
+                y=df1["fix_close"] - df2["fix_close"],
                 mode="lines",
                 name="差分",
             ),
