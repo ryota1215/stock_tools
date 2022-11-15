@@ -123,7 +123,16 @@ class visualization:
         fig.update_xaxes(rangebreaks=[dict(values=d_breaks)])
         fig.show()
 
-    def pairchart(self, df1, df2, start_day=0, end_day=99999999, indexing=False):
+    def pairchart(
+        self,
+        df1,
+        df2,
+        start_day=0,
+        end_day=99999999,
+        indexing=False,
+        corr=False,
+        corr_span=50,
+    ):
         # 引数追加 , start_day, end_day
         """
         visualization.pairchart(df1,df2,スタート日付{"20200101"},エンド日付)
@@ -135,7 +144,9 @@ class visualization:
         :param df2:df 株価のdataframe
         :param start_day:int (例20200101) 表示期間の始まりの日
         :param end_day:int(例20200101) 表示期間の終わりの日
-        :param indexing:bool Trueなら100を基準とした終値指数化に変更,Falseは株価終値で表示
+        :param indexing:bool Trueなら上段の株価終値を100を基準とした終値指数化に変更
+        :param corr:bool Trueなら下段に相関分析を表示する、Falseなら価格差分を表示
+        :param corr_span:int corrの計算期間の変更
         :return ペアチャート
         """
         # jpxのdateカラムはDateのため変換
@@ -157,14 +168,22 @@ class visualization:
             df2 = df2.rename(columns={"Date": "date", "Code": "CODE"})
         code1 = df1["CODE"][0]
         code2 = df2["CODE"][0]
+        # 期間範囲指定
         df1 = df1[(df1["date"] >= f"{start_day}") & (df1["date"] <= f"{end_day}")]
         df2 = df2[(df2["date"] >= f"{start_day}") & (df2["date"] <= f"{end_day}")]
+        # 指数化の計算
         if indexing == True:
             df1 = df1.reset_index()
             df1["fix_close"] = df1["fix_close"] / df1["fix_close"][0] * 100
             df2 = df2.reset_index()
             df2["fix_close"] = df2["fix_close"] / df2["fix_close"][0] * 100
-            print(df2["fix_close"])
+        # 差分or相関係数の作成
+        if corr == False:
+            param = df1["fix_close"] - df2["fix_close"]
+            param_name = "差分"
+        else:
+            param = df1["fix_close"].rolling(corr_span).corr(df2["fix_close"])
+            param_name = "相関分析"
         # subplotsで複数のグラフ画面を作成する
         fig = make_subplots(
             rows=2,  # 行数設定
@@ -172,8 +191,8 @@ class visualization:
             # shared_yaxes='all', #y軸を共有する
             shared_xaxes="all",  # x軸を共有する
             vertical_spacing=0.1,  # サブプロット行間のスペース
-            subplot_titles=("chart", "差分"),  # グラフ上のタイトル設定
             row_heights=[3, 1],  # グラフの大きさ 相対的比率
+            subplot_titles=["chart", param_name],  # グラフ上のタイトル設定
         )
         # add_traceでグラフを入れる
         fig.add_trace(
@@ -196,12 +215,13 @@ class visualization:
             row=1,
             col=1,
         )
+        # 下段に差分または相関係数のグラフを作成する
         fig.add_trace(
             go.Scatter(
                 x=df1["date"],
-                y=df1["fix_close"] - df2["fix_close"],
+                y=param,
                 mode="lines",
-                name="差分",
+                name=param_name,
             ),
             row=2,
             col=1,
