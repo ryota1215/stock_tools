@@ -4,15 +4,20 @@ import numpy as np
 import matplotlib.pyplot as plt
 from sklearn.linear_model import LinearRegression
 from sklearn.preprocessing import StandardScaler, MinMaxScaler
+from sklearn.metrics import r2_score
 import calendar
 import locale
 import warnings
+import datetime
+import jpholiday
 from logging import getLogger
 
 logger = getLogger(__name__)
 
 warnings.simplefilter("ignore")
 # PL評価
+
+
 def eval_pl(pl: float, Print: bool = True):
     sr = np.mean(pl) / np.std(pl) * np.sqrt(252)
     sr = round(sr, 2)
@@ -174,3 +179,48 @@ def coef_intercept(x, y, scaler: str = None):
         else:
             dict_return[name] = val
     return dict_return
+
+
+def is_sq(date):
+    year, month = date.year, date.month
+    sq_date = get_day_of_nth_dow(year, month, 2, 4)
+    sq_date = datetime.date(year, month, sq_date)
+    while True:
+        if jpholiday.is_holiday(sq_date) or (sq_date.weekday() > 5):
+            sq_date = sq_date - datetime.timedelta(days=1)
+        else:
+            break
+    return sq_date == date
+
+
+def get_day_of_nth_dow(year, month, nth, dow):
+    '''dow: Monday(0) - Sunday(6)'''
+    if nth < 1 or dow < 0 or dow > 6:
+        return None
+
+    first_dow, n = calendar.monthrange(year, month)
+    day = 7 * (nth - 1) + (dow - first_dow) % 7 + 1
+
+    return day if day <= n else None
+
+
+def trand_score(val, return_arr=False):
+    try:
+        val = val.values
+    except AttributeError:
+        pass
+    is_not_var0 = int(np.var(val) != 0)
+
+    x = np.arange(len(val)) + 1
+    y = val
+
+    lr = LinearRegression()
+    lr.fit(x.reshape(-1, 1), y.reshape(-1, 1))
+    coef = lr.coef_[0][0] * 10000
+    pred = lr.predict(x.reshape(-1, 1)).ravel()
+    val_r2 = r2_score(y, pred) * is_not_var0
+    score = val_r2 * coef
+    if return_arr:
+        return score
+    else:
+        return pd.DataFrame([[coef, val_r2, score]], columns=["coef", "r2", "score"])
