@@ -227,7 +227,7 @@ def trand_score(val, return_arr=False):
         return pd.DataFrame([[coef, val_r2, score]], columns=["coef", "r2", "score"])
 
 
-def make_sector_index(dfs_code,dict_sector_codes,lst_sector):
+def make_sector_index(dfs_code, dict_sector_codes, lst_sector):
     """
     jpxの株価データからセクターインデックスを作成する
     param : dfs_code 各銘柄の入ったdict
@@ -239,13 +239,14 @@ def make_sector_index(dfs_code,dict_sector_codes,lst_sector):
     max_len = len(dfs_code["72030"])
     for target_sector in lst_sector:
         # その他はetf
-        if target_sector == "(その他)": continue
+        if target_sector == "(その他)":
+            continue
         # セクター内の各銘柄の時価総額を取得
         dict_market_cap = {
             code: dfs_code[code].set_index("Date")["market_cap"].rename(code)
             for code in dict_sector_codes[target_sector]
         }
-        df_market_cap = pd.concat(dict_market_cap,axis=1)
+        df_market_cap = pd.concat(dict_market_cap, axis=1)
         df_market_cap = df_market_cap.fillna(0.0000000000000000000000000000000000000000000000001)
         # セクター内の各銘柄の騰落率を取得
         dict_oc_change = {
@@ -258,14 +259,14 @@ def make_sector_index(dfs_code,dict_sector_codes,lst_sector):
             for code in dict_sector_codes[target_sector]
         }
         dict_gap = {
-            code: dfs_code[code].set_index("Date")["AdjustmentOpen"].rename(code) / 
+            code: dfs_code[code].set_index("Date")["AdjustmentOpen"].rename(code) /
             dfs_code[code]["AdjustmentClose"].shift().values - 1
             for code in dict_sector_codes[target_sector]
         }
 
-        df_oc_change = pd.concat(dict_oc_change,axis=1)
-        df_cc_change = pd.concat(dict_cc_change,axis=1)
-        df_gap = pd.concat(dict_gap,axis=1)
+        df_oc_change = pd.concat(dict_oc_change, axis=1)
+        df_cc_change = pd.concat(dict_cc_change, axis=1)
+        df_gap = pd.concat(dict_gap, axis=1)
         df_oc_change = df_oc_change.fillna(0)
         df_cc_change = df_cc_change.fillna(0)
         df_gap = df_gap.fillna(0)
@@ -301,23 +302,26 @@ def make_sector_index(dfs_code,dict_sector_codes,lst_sector):
                 index=pd.to_datetime(df_oc_change.index),
                 columns=[f"sector_term{term}_oc"],
             ))
-        df_terms_oc = pd.concat(lst_term_oc,axis=1)   
+        df_terms_oc = pd.concat(lst_term_oc, axis=1)
 
-        df_sector_index = pd.merge(df_sector_oc,df_sector_cc,left_index=True,right_index=True)
-        df_sector_index = pd.merge(df_sector_index,df_sector_gap,left_index=True,right_index=True)
-        df_sector_index = pd.merge(df_sector_index,df_terms_oc,left_index=True,right_index=True)
-        df_sector_index.columns = [c.replace("sector",target_sector) for c in df_sector_index.columns]
-        df_sector_indexs = pd.concat([df_sector_indexs,df_sector_index],axis=1)
+        df_sector_index = pd.merge(df_sector_oc, df_sector_cc, left_index=True, right_index=True)
+        df_sector_index = pd.merge(df_sector_index, df_sector_gap,
+                                   left_index=True, right_index=True)
+        df_sector_index = pd.merge(df_sector_index, df_terms_oc, left_index=True, right_index=True)
+        df_sector_index.columns = [c.replace("sector", target_sector)
+                                   for c in df_sector_index.columns]
+        df_sector_indexs = pd.concat([df_sector_indexs, df_sector_index], axis=1)
     return df_sector_indexs
 
-def calc_term_oc(code,dfs_code,term,max_len):
+
+def calc_term_oc(code, dfs_code, term, max_len):
     try:
-        term_close = sliding_window_view(dfs_code[code]["AdjustmentClose"].values,term)[:,-1]
+        term_close = sliding_window_view(dfs_code[code]["AdjustmentClose"].values, term)[:, -1]
     except ValueError:
         return np.arange(max_len) * 0
-    term_open = sliding_window_view(dfs_code[code]["AdjustmentOpen"].values,term)[:,0]
-    val = term_close / term_open -1
+    term_open = sliding_window_view(dfs_code[code]["AdjustmentOpen"].values, term)[:, 0]
+    val = term_close / term_open - 1
     if len(val) != max_len:
-        return np.hstack((np.arange(max_len - len(val)) * 0 , val))
+        return np.hstack((np.arange(max_len - len(val)) * 0, val))
     else:
         return val
