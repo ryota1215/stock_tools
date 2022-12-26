@@ -130,3 +130,6 @@ dmypy.json
 
 # mac pc
 .DS_Store
+
+# 共有しないファイル
+imgs/
