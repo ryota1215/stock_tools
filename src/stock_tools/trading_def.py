@@ -371,13 +371,10 @@ def add_market_cap(df):
                 date - datetime.timedelta(days=120):date + datetime.timedelta(days=120)
             ]
             target_date = target.index[np.argmin(abs(target - val))]
-        except:
-            display(df_adjustmentfactor)
-            display(df_shares_pct[df_shares_pct != 0])
+        except Exception as e:
+            print(e)
             print(df_code["Code"].unique(), date, val)
-            display(df_shares_pct_select.loc[
-                date - datetime.timedelta(days=120):date + datetime.timedelta(days=120)
-            ])
+
             adjust = 1 / val - 1
             df_shares_pct.loc[date] = adjust
             continue
