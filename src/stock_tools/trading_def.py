@@ -325,3 +325,69 @@ def calc_term_oc(code, dfs_code, term, max_len):
         return np.hstack((np.arange(max_len - len(val)) * 0, val))
     else:
         return val
+
+
+def preprocess_jpxdata(df):
+    """
+    jpx前処理
+    param : df jpxのDataflame
+    return : df
+    """
+    df = df.copy()
+    df["Date"] = pd.to_datetime(df["Date"])
+    df["oc_change"] = df["AdjustmentClose"] / df["AdjustmentOpen"] - 1
+    df["gap"] = df["AdjustmentOpen"] / df["AdjustmentClose"].shift().values - 1
+    df["cc_change"] = df["AdjustmentClose"].pct_change()
+    df = add_market_cap(df)
+    return df
+
+
+def preprocess_kabudata(df):
+    """
+    kabu+前処理
+    param : df kabu+のDataflame
+    return : df
+    """
+    df = df.copy()
+    df["DATE"] = pd.to_datetime(df["DATE"])
+    return df
+
+
+def add_market_cap(df):
+    """
+    jpxデータの時価総額修正
+    param : df jpxのDataflame
+    return : df
+    """
+    df_code = df.set_index("Date")
+    df_adjustmentfactor = df_code["AdjustmentFactor"][df_code["AdjustmentFactor"] != 1]
+    df_shares = df_code["NumberOfIssuedAndOutstandingSharesAtTheEndOfFiscalYearIncludingTreasuryStock"]
+    df_shares_pct = df_shares.pct_change().dropna()
+    df_shares_pct_select = df_shares_pct[(df_shares_pct >= 0.03)
+                                         | (df_shares_pct <= -0.03)].dropna()
+    for date, val in df_adjustmentfactor.iteritems():
+        try:
+            target = df_shares_pct_select.loc[
+                date - datetime.timedelta(days=120):date + datetime.timedelta(days=120)
+            ]
+            target_date = target.index[np.argmin(abs(target - val))]
+        except:
+            display(df_adjustmentfactor)
+            display(df_shares_pct[df_shares_pct != 0])
+            print(df_code["Code"].unique(), date, val)
+            display(df_shares_pct_select.loc[
+                date - datetime.timedelta(days=120):date + datetime.timedelta(days=120)
+            ])
+            adjust = 1 / val - 1
+            df_shares_pct.loc[date] = adjust
+            continue
+        shares = df_shares_pct_select.loc[target_date]
+        assert shares != 0, f"shares Error {date} {shares}"
+        adjust = 1 / val - 1
+        df_shares_pct.loc[date] = adjust
+        df_shares_pct.loc[target_date] = (1 / round(1 + df_shares_pct.loc[date], 3)) - 1
+
+    df_code["StockShares_fixed"] = df_shares * np.cumprod(df_shares_pct + 1)
+    df_code["market_cap"] = df_code["StockShares_fixed"] * df_code["Close"]
+    df_code = df_code.reset_index()
+    return df_code
