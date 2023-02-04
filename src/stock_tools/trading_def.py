@@ -334,6 +334,8 @@ def preprocess_jpxdata(df):
     return : df
     """
     df = df.copy()
+    if len(df) == 0:
+        return df
     df["Date"] = pd.to_datetime(df["Date"])
     df["oc_change"] = df["AdjustmentClose"] / df["AdjustmentOpen"] - 1
     df["gap"] = df["AdjustmentOpen"] / df["AdjustmentClose"].shift().values - 1
