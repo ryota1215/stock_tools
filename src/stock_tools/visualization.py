@@ -250,4 +250,8 @@ class visualization:
         # 株価データの日付データに含まれていない日付を抽出
         d_breaks = [d for d in d_all.strftime("%Y-%m-%d").tolist() if not d in d_obs]
         fig.update_xaxes(rangebreaks=[dict(values=d_breaks)])
+        # 相関分析時にy軸の最大最小値の固定化
+        if corr == True:
+            fig.update_yaxes(range=[-1, 1], row=2, col=1)
+        # グラフ出力
         fig.show()
