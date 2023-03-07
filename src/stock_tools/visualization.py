@@ -132,6 +132,8 @@ class visualization:
         indexing=False,
         corr=False,
         corr_span=50,
+        add_volume=False,
+        add_volume_log=False,
     ):
         # 引数追加 , start_day, end_day
         """
@@ -147,6 +149,8 @@ class visualization:
         :param indexing:bool Trueなら上段の株価終値を100を基準とした終値指数化に変更
         :param corr:bool Trueなら下段に相関分析を表示する、Falseなら価格差分を表示
         :param corr_span:int corrの計算期間の変更
+        :param add_volume:bool Trueなら下段に出来高表示する
+        :param add_volume_log:bool Trueなら出来高の表示をlog表示にする（底は10で固定）
         :return ペアチャート
         """
         # jpxのdateカラムはDateのため変換
@@ -154,7 +158,7 @@ class visualization:
             df1 = df1.rename(
                 columns={
                     f"Adjustment{c}": f"fix_{c.lower()}"
-                    for c in ["Open", "High", "Low", "Close"]
+                    for c in ["Open", "High", "Low", "Close", "Volume"]
                 }
             )
             df1 = df1.rename(columns={"Date": "date", "Code": "CODE"})
@@ -162,7 +166,7 @@ class visualization:
             df2 = df2.rename(
                 columns={
                     f"Adjustment{c}": f"fix_{c.lower()}"
-                    for c in ["Open", "High", "Low", "Close"]
+                    for c in ["Open", "High", "Low", "Close", "Volume"]
                 }
             )
             df2 = df2.rename(columns={"Date": "date", "Code": "CODE"})
@@ -184,14 +188,22 @@ class visualization:
         else:
             param = df1["fix_close"].rolling(corr_span).corr(df2["fix_close"])
             param_name = "相関分析"
+        # 出来高にparam変更
+        if add_volume == True:
+            param_name = "出来高"
         # subplotsで複数のグラフ画面を作成する
+        row_heights_param = [3, 1]
+        row_param = 2
+        # 出来高のsubplots設定変更（3:2のおおきさに変更)
+        if add_volume == True:
+            row_heights_param[1] = 2
         fig = make_subplots(
-            rows=2,  # 行数設定
+            rows=row_param,  # 行数設定
             cols=1,  # 列数設定
             # shared_yaxes='all', #y軸を共有する
             shared_xaxes="all",  # x軸を共有する
             vertical_spacing=0.1,  # サブプロット行間のスペース
-            row_heights=[3, 1],  # グラフの大きさ 相対的比率
+            row_heights=row_heights_param,  # グラフの大きさ 相対的比率
             subplot_titles=["chart", param_name],  # グラフ上のタイトル設定
         )
         # add_traceでグラフを入れる
@@ -216,17 +228,48 @@ class visualization:
             col=1,
         )
         # 下段に差分または相関係数のグラフを作成する
-        fig.add_trace(
-            go.Scatter(
-                x=df1["date"],
-                y=param,
-                mode="lines",
-                name=param_name,
-            ),
-            row=2,
-            col=1,
-        )
+        if add_volume == False:
+            fig.add_trace(
+                go.Scatter(
+                    x=df1["date"],
+                    y=param,
+                    mode="lines",
+                    name=param_name,
+                ),
+                row=2,
+                col=1,
+            )
+        else:
+            fig.add_trace(
+                go.Bar(
+                    x=df1["date"],
+                    y=df1["fix_volume"],
+                    # mode="lines",
+                    name=f"{code1}",
+                    opacity=0.3,
+                    marker_color="blue",
+                ),
+                row=2,
+                col=1,
+                # secondary_y=True,
+            )
+            fig.add_trace(
+                go.Bar(
+                    x=df2["date"],
+                    y=df2["fix_volume"],
+                    # mode="lines",
+                    name=f"{code2}",
+                    opacity=0.3,
+                    marker_color="red",
+                ),
+                row=2,
+                col=1,
+                # secondary_y=True,
+            )
         # layoutでレイアウト設定をする
+        height_param = 800
+        if add_volume == True:
+            height_param += 100
         fig.update_layout(
             # グラフタイトル
             # title_text="OHLC",
@@ -237,8 +280,9 @@ class visualization:
                 visible=False,
             ),  # レンジスライダー削除
             yaxis=dict(fixedrange=False),  # y軸のズームを可能にする
-            height=800,  # グラフ高さの編集
+            height=height_param,  # グラフ高さの編集
             width=900,  # グラフ横幅の編集
+            margin=dict(l=0, r=0, t=30, b=0),  # グラフ間の隙間幅の調整
         )
         # 土日祝の隙間を削除するためにrangebreaks作成して、update_xaxesで反映させる
         # 日付objectをdatetime型に変換
@@ -251,7 +295,10 @@ class visualization:
         d_breaks = [d for d in d_all.strftime("%Y-%m-%d").tolist() if not d in d_obs]
         fig.update_xaxes(rangebreaks=[dict(values=d_breaks)])
         # 相関分析時にy軸の最大最小値の固定化
-        if corr == True:
+        if (corr == True) and (add_volume == False):
             fig.update_yaxes(range=[-1, 1], row=2, col=1)
+        # y軸をlogに変更する
+        if (add_volume == True) and (add_volume_log == True):
+            fig.update_yaxes(type="log", row=2, col=1)
         # グラフ出力
         fig.show()
