@@ -2,6 +2,7 @@ import numpy as np
 import pandas as pd
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
+import matplotlib.pyplot as plt
 
 """
 要件
@@ -42,7 +43,7 @@ class visualization:
                 }
             )
             df = df.rename(columns={"Date": "date", "Code": "CODE"})
-        code = df["CODE"][0]
+        code = df["CODE"].iloc[0]
         # subplotsで複数のグラフ画面を作成する
         if len(oscillator_list) != 0:
             heights_list = np.ones(1 + len(oscillator_list))  # row_heightsグラフ高さ倍率リストの作成
@@ -127,8 +128,8 @@ class visualization:
         self,
         df1,
         df2,
-        start_day=0,
-        end_day=99999999,
+        start_day=19500101,
+        end_day=21001231,
         indexing=False,
         corr=False,
         corr_span=50,
@@ -170,17 +171,17 @@ class visualization:
                 }
             )
             df2 = df2.rename(columns={"Date": "date", "Code": "CODE"})
-        code1 = df1["CODE"][0]
-        code2 = df2["CODE"][0]
+        code1 = df1["CODE"].iloc[0]
+        code2 = df2["CODE"].iloc[0]
         # 期間範囲指定
         df1 = df1[(df1["date"] >= f"{start_day}") & (df1["date"] <= f"{end_day}")]
         df2 = df2[(df2["date"] >= f"{start_day}") & (df2["date"] <= f"{end_day}")]
         # 指数化の計算
         if indexing == True:
             df1 = df1.reset_index()
-            df1["fix_close"] = df1["fix_close"] / df1["fix_close"][0] * 100
+            df1["fix_close"] = df1["fix_close"] / df1["fix_close"].iloc[0] * 100
             df2 = df2.reset_index()
-            df2["fix_close"] = df2["fix_close"] / df2["fix_close"][0] * 100
+            df2["fix_close"] = df2["fix_close"] / df2["fix_close"].iloc[0] * 100
         # 差分or相関係数の作成
         if corr == False:
             param = df1["fix_close"] - df2["fix_close"]
@@ -302,3 +303,103 @@ class visualization:
             fig.update_yaxes(type="log", row=2, col=1)
         # グラフ出力
         fig.show()
+
+    def multiplot_matplotlib(
+        self,
+        df_list,
+        day_period=30,
+        is_plot_mean=False,
+        is_plot_mean_alpha=0.3,
+        log_y=False,
+        log_y_base=10,
+        log_y_linthresh=10.0,
+    ):
+        """
+        複数の株価チャートを表示する
+        :param df_list: list of DataFrame 株価データを含むDataFrameのリスト
+        :param day_period: int イベント日からの日数
+        :param is_plot_mean: bool 銘柄群平均騰落率をplotするかどうか
+        :param is_plot_mean_alpha: int is_plot_meanのplotの濃さ
+        :param log_y: bool y軸をlog表示にする
+        :param log_y_base: float 対数の底の値
+        :param log_y_linthresh: float 対数スケールを線形スケールに変更する値。0からどこまでを線形スケールにするか範囲を設定。値が小さいほど0付近の動きが大きくなる。
+        :return: 複数銘柄のチャート
+        """
+        # プロットの設定
+        fig, ax = plt.subplots(figsize=(15, 8))
+        # 複数の株価を同じグラフにプロット
+        for i, df in enumerate(df_list):
+            # jpxのdateカラムはDateのため変換
+            if "date" not in df.columns:
+                df = df.rename(
+                    columns={
+                        f"Adjustment{c}": f"fix_{c.lower()}"
+                        for c in ["Open", "High", "Low", "Close"]
+                    }
+                )
+                df = df.rename(columns={"Date": "date", "Code": "CODE"})
+            # インデックスをリセット
+            df = df.reset_index(drop=True)
+            # 表示する期間を制限
+            df = df.iloc[:day_period]
+            # 元のdfにも反映させる
+            df_list[i] = df
+            # 騰落率の計算
+            returns = (df["fix_close"] / df["fix_open"].iloc[0] - 1) * 100
+            # 0から開始するため最初の行に0を追加して
+            returns = pd.Series([0]).append(returns, ignore_index=True)
+            # 0から始めるためindexの数を一つ増やす
+            x_index_values = df.index.values
+            x_index_values = np.append(x_index_values, x_index_values[-1] + 1)
+            # グラフの描画
+            if is_plot_mean:
+                ax.plot(
+                    x_index_values,
+                    returns,
+                    marker=".",
+                    alpha=is_plot_mean_alpha,
+                    label=df["CODE"].iloc[0],
+                )
+            else:
+                ax.plot(
+                    x_index_values,
+                    returns,
+                    marker=".",
+                    alpha=1.0,
+                    label=df["CODE"].iloc[0],
+                )
+        if is_plot_mean:
+            # 全体の騰落率の平均値を求める
+            all_returns = [
+                returns
+                for df in df_list
+                for returns in (df["fix_close"] / df["fix_open"].iloc[0] - 1) * 100
+            ]
+            # 各日の騰落率の平均値を求める
+            mean_daily_returns = [
+                np.mean(
+                    [
+                        all_returns[i]
+                        for i in range(len(all_returns))
+                        if i % day_period == j
+                    ]
+                )
+                for j in range(day_period)
+            ]
+            # 0から始まるようにする
+            mean_daily_returns.insert(0, 0)
+            # 全体の騰落率の平均値をプロット
+            ax.plot(mean_daily_returns, marker=".", label="Mean Returns", color="red")
+        # グラフのラベルとタイトルを設定
+        ax.set_xlabel("Date")
+        ax.set_ylabel("Returns (%)")
+        ax.set_title("Price Returns")
+        # 凡例を表示
+        fig.legend()
+        fig.subplots_adjust(right=0.8)
+        # y軸を対数表示
+        if log_y:
+            ax.set_yscale("symlog", base=log_y_base, linthresh=log_y_linthresh)
+            ax.set_ylabel("Log Returns (%)")
+        # グラフを表示
+        plt.show()
