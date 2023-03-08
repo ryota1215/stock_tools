@@ -215,10 +215,28 @@ def trand_score(val, return_arr=False):
     x = np.arange(len(val)) + 1
     y = val
 
-    lr = LinearRegression()
-    lr.fit(x.reshape(-1, 1), y.reshape(-1, 1))
-    coef = lr.coef_[0][0]
-    pred = lr.predict(x.reshape(-1, 1)).ravel()
+    coef = np.polyfit(x, y, 1)[0]
+    pred = np.polyval(np.polyfit(x, y, 1), x)
+    val_r2 = r2_score(y, pred) * is_not_var0
+    score = val_r2 * coef
+    if return_arr:
+        return score
+    else:
+        return pd.DataFrame([[coef, val_r2, score]], columns=["coef", "r2", "score"])
+
+
+def trand_score(val, return_arr=False):
+    try:
+        val = val.values
+    except AttributeError:
+        pass
+    is_not_var0 = int(np.var(val) != 0)
+
+    x = np.arange(len(val)) + 1
+    y = val
+
+    coef = np.polyfit(x, y, 1)[0]
+    pred = np.polyval(np.polyfit(x, y, 1), x)
     val_r2 = r2_score(y, pred) * is_not_var0
     score = val_r2 * coef
     if return_arr:
