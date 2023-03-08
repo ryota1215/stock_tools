@@ -217,7 +217,7 @@ def trand_score(val, return_arr=False):
 
     lr = LinearRegression()
     lr.fit(x.reshape(-1, 1), y.reshape(-1, 1))
-    coef = lr.coef_[0][0] * 10000
+    coef = lr.coef_[0][0]
     pred = lr.predict(x.reshape(-1, 1)).ravel()
     val_r2 = r2_score(y, pred) * is_not_var0
     score = val_r2 * coef
