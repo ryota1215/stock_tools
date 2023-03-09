@@ -120,7 +120,7 @@ class visualization:
         # 株価データの日付リストを取得
         d_obs = [d.strftime("%Y-%m-%d") for d in date]
         # 株価データの日付データに含まれていない日付を抽出
-        d_breaks = [d for d in d_all.strftime("%Y-%m-%d").tolist() if not d in d_obs]
+        d_breaks = [d for d in d_all.strftime("%Y-%m-%d").tolist() if d not in d_obs]
         fig.update_xaxes(rangebreaks=[dict(values=d_breaks)])
         fig.show()
 
@@ -130,12 +130,12 @@ class visualization:
         df2,
         start_day=19500101,
         end_day=21001231,
-        indexing=True,
-        corr=True,
+        is_indexing=True,
+        is_corr=True,
         corr_span=5,
-        add_volume=False,
-        add_volume_log=False,
-        diff=True,
+        is_add_volume=False,
+        is_add_volume_log=False,
+        is_diff=True,
     ):
         # 引数追加 , start_day, end_day
         """
@@ -148,12 +148,12 @@ class visualization:
         :param df2:df 株価のdataframe
         :param start_day:int (例20200101) 表示期間の始まりの日
         :param end_day:int(例20200101) 表示期間の終わりの日
-        :param indexing:bool Trueなら上段の株価終値を100を基準とした終値指数化に変更
-        :param corr:bool Trueなら下段に相関分析を表示する
+        :param is_indexing:bool Trueなら上段の株価終値を100を基準とした終値指数化に変更
+        :param is_corr:bool Trueなら下段に相関分析を表示する
         :param corr_span:int corrの計算期間の変更
-        :param add_volume:bool Trueなら下段に出来高表示する
-        :param add_volume_log:bool Trueなら出来高の表示をlog表示にする（底は10で固定）
-        :param diff:bool Trueなら上段の値の差分を2軸目に表示する
+        :param is_add_volume:bool Trueなら下段に出来高表示する
+        :param is_add_volume_log:bool Trueなら出来高の表示をlog表示にする（底は10で固定）
+        :param is_diff:bool Trueなら上段の値の差分を2軸目に表示する
         :return ペアチャート
         """
         # １　データの前処理はここ
@@ -180,29 +180,29 @@ class visualization:
         df1 = df1[(df1["date"] >= f"{start_day}") & (df1["date"] <= f"{end_day}")]
         df2 = df2[(df2["date"] >= f"{start_day}") & (df2["date"] <= f"{end_day}")]
         # 指数化の計算
-        if indexing == True:
+        if is_indexing:
             df1 = df1.reset_index()
             df1["fix_close"] = df1["fix_close"] / df1["fix_close"].iloc[0] * 100
             df2 = df2.reset_index()
             df2["fix_close"] = df2["fix_close"] / df2["fix_close"].iloc[0] * 100
         # 差分の作成
-        if diff == True:
+        if is_diff:
             param_diff = df1["fix_close"] - df2["fix_close"]
             param_name_diff = "差分"
         param_name = ""
         # 相関係数の作成
-        if corr == True:
+        if is_corr:
             param = df1["fix_close"].rolling(corr_span).corr(df2["fix_close"])
             param_name = "相関分析"
         # 出来高にparam変更
-        if add_volume == True:
+        if is_add_volume:
             param_name = "出来高"
         # ２　make_subplots設定はここ
         # subplotsで複数のグラフ画面を作成する
         row_heights_param = [3, 1]
         row_param = 2
         # 出来高のsubplots設定変更（3:2のおおきさに変更)
-        if add_volume == True:
+        if is_add_volume:
             row_heights_param[1] = 2
         fig = make_subplots(
             rows=row_param,  # 行数設定
@@ -236,7 +236,7 @@ class visualization:
             row=1,
             col=1,
         )
-        if diff == True:
+        if is_diff:
             fig.add_trace(
                 go.Scatter(
                     x=df1["date"],
@@ -256,7 +256,7 @@ class visualization:
                 secondary_y=True,  # 2軸目の軸を設定
             )
         # 下段に差分または相関係数のグラフを作成する
-        if (corr == True) and (add_volume == False):
+        if is_corr and not is_add_volume:
             fig.add_trace(
                 go.Scatter(
                     x=df1["date"],
@@ -268,7 +268,7 @@ class visualization:
                 row=2,
                 col=1,
             )
-        if add_volume == True:
+        if is_add_volume:
             fig.add_trace(
                 go.Bar(
                     x=df1["date"],
@@ -298,7 +298,7 @@ class visualization:
         # ４　レイアウト設定はここ
         # layoutでレイアウト設定をする
         height_param = 800
-        if add_volume == True:
+        if is_add_volume:
             height_param += 100
         fig.update_layout(
             # グラフタイトル
@@ -322,14 +322,14 @@ class visualization:
         # 株価データの日付リストを取得
         d_obs = [d.strftime("%Y-%m-%d") for d in date]
         # 株価データの日付データに含まれていない日付を抽出
-        d_breaks = [d for d in d_all.strftime("%Y-%m-%d").tolist() if not d in d_obs]
+        d_breaks = [d for d in d_all.strftime("%Y-%m-%d").tolist() if d not in d_obs]
         fig.update_xaxes(rangebreaks=[dict(values=d_breaks)])
         # ５　追加レイアウト設定はここ
         # 相関分析時にy軸の最大最小値の固定化
-        if (corr == True) and (add_volume == False):
+        if is_corr and not is_add_volume:
             fig.update_yaxes(range=[-1, 1], row=2, col=1)
         # y軸をlogに変更する
-        if (add_volume == True) and (add_volume_log == True):
+        if is_add_volume and is_add_volume_log:
             fig.update_yaxes(type="log", row=2, col=1)
         # グラフ出力
         fig.show()
@@ -340,7 +340,7 @@ class visualization:
         day_period=30,
         is_plot_mean=False,
         is_plot_mean_alpha=0.3,
-        log_y=False,
+        is_log_y=False,
         log_y_base=10,
         log_y_linthresh=10.0,
     ):
@@ -428,7 +428,7 @@ class visualization:
         fig.legend()
         fig.subplots_adjust(right=0.8)
         # y軸を対数表示
-        if log_y:
+        if is_log_y:
             ax.set_yscale("symlog", base=log_y_base, linthresh=log_y_linthresh)
             ax.set_ylabel("Log Returns (%)")
         # グラフを表示
