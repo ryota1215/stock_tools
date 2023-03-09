@@ -128,8 +128,8 @@ class visualization:
         self,
         df1,
         df2,
-        start_day=0,
-        end_day=99999999,
+        start_day=19500101,
+        end_day=21001231,
         indexing=True,
         corr=True,
         corr_span=5,
@@ -174,17 +174,17 @@ class visualization:
                 }
             )
             df2 = df2.rename(columns={"Date": "date", "Code": "CODE"})
-        code1 = df1["CODE"][0]
-        code2 = df2["CODE"][0]
+        code1 = df1["CODE"].iloc[0]
+        code2 = df2["CODE"].iloc[0]
         # 期間範囲指定
         df1 = df1[(df1["date"] >= f"{start_day}") & (df1["date"] <= f"{end_day}")]
         df2 = df2[(df2["date"] >= f"{start_day}") & (df2["date"] <= f"{end_day}")]
         # 指数化の計算
         if indexing == True:
             df1 = df1.reset_index()
-            df1["fix_close"] = df1["fix_close"] / df1["fix_close"][0] * 100
+            df1["fix_close"] = df1["fix_close"] / df1["fix_close"].iloc[0] * 100
             df2 = df2.reset_index()
-            df2["fix_close"] = df2["fix_close"] / df2["fix_close"][0] * 100
+            df2["fix_close"] = df2["fix_close"] / df2["fix_close"].iloc[0] * 100
         # 差分の作成
         if diff == True:
             param_diff = df1["fix_close"] - df2["fix_close"]
