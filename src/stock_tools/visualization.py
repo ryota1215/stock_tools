@@ -130,11 +130,12 @@ class visualization:
         df2,
         start_day=19500101,
         end_day=21001231,
-        indexing=False,
-        corr=False,
-        corr_span=50,
+        indexing=True,
+        corr=True,
+        corr_span=5,
         add_volume=False,
         add_volume_log=False,
+        diff=True,
     ):
         # 引数追加 , start_day, end_day
         """
@@ -148,12 +149,14 @@ class visualization:
         :param start_day:int (例20200101) 表示期間の始まりの日
         :param end_day:int(例20200101) 表示期間の終わりの日
         :param indexing:bool Trueなら上段の株価終値を100を基準とした終値指数化に変更
-        :param corr:bool Trueなら下段に相関分析を表示する、Falseなら価格差分を表示
+        :param corr:bool Trueなら下段に相関分析を表示する
         :param corr_span:int corrの計算期間の変更
         :param add_volume:bool Trueなら下段に出来高表示する
         :param add_volume_log:bool Trueなら出来高の表示をlog表示にする（底は10で固定）
+        :param diff:bool Trueなら上段の値の差分を2軸目に表示する
         :return ペアチャート
         """
+        # １　データの前処理はここ
         # jpxのdateカラムはDateのため変換
         if "date" not in df1.columns:
             df1 = df1.rename(
@@ -182,16 +185,19 @@ class visualization:
             df1["fix_close"] = df1["fix_close"] / df1["fix_close"].iloc[0] * 100
             df2 = df2.reset_index()
             df2["fix_close"] = df2["fix_close"] / df2["fix_close"].iloc[0] * 100
-        # 差分or相関係数の作成
-        if corr == False:
-            param = df1["fix_close"] - df2["fix_close"]
-            param_name = "差分"
-        else:
+        # 差分の作成
+        if diff == True:
+            param_diff = df1["fix_close"] - df2["fix_close"]
+            param_name_diff = "差分"
+        param_name = ""
+        # 相関係数の作成
+        if corr == True:
             param = df1["fix_close"].rolling(corr_span).corr(df2["fix_close"])
             param_name = "相関分析"
         # 出来高にparam変更
         if add_volume == True:
             param_name = "出来高"
+        # ２　make_subplots設定はここ
         # subplotsで複数のグラフ画面を作成する
         row_heights_param = [3, 1]
         row_param = 2
@@ -206,7 +212,9 @@ class visualization:
             vertical_spacing=0.1,  # サブプロット行間のスペース
             row_heights=row_heights_param,  # グラフの大きさ 相対的比率
             subplot_titles=["chart", param_name],  # グラフ上のタイトル設定
+            specs=[[{"secondary_y": True}], [{}]],  # 2軸目追加
         )
+        # ３　add_trace グラフの挿入はここ
         # add_traceでグラフを入れる
         fig.add_trace(
             go.Scatter(
@@ -228,19 +236,39 @@ class visualization:
             row=1,
             col=1,
         )
+        if diff == True:
+            fig.add_trace(
+                go.Scatter(
+                    x=df1["date"],
+                    y=param_diff,
+                    mode="lines",
+                    name=f"{param_name_diff}",
+                    marker_color="gold",
+                ),
+                row=1,
+                col=1,
+                secondary_y=True,
+            )
+            fig.update_yaxes(
+                title_text="差分",  # 2軸目のラベル設定
+                row=1,
+                col=1,
+                secondary_y=True,  # 2軸目の軸を設定
+            )
         # 下段に差分または相関係数のグラフを作成する
-        if add_volume == False:
+        if (corr == True) and (add_volume == False):
             fig.add_trace(
                 go.Scatter(
                     x=df1["date"],
                     y=param,
                     mode="lines",
                     name=param_name,
+                    marker_color="limegreen",
                 ),
                 row=2,
                 col=1,
             )
-        else:
+        if add_volume == True:
             fig.add_trace(
                 go.Bar(
                     x=df1["date"],
@@ -267,6 +295,7 @@ class visualization:
                 col=1,
                 # secondary_y=True,
             )
+        # ４　レイアウト設定はここ
         # layoutでレイアウト設定をする
         height_param = 800
         if add_volume == True:
@@ -295,6 +324,7 @@ class visualization:
         # 株価データの日付データに含まれていない日付を抽出
         d_breaks = [d for d in d_all.strftime("%Y-%m-%d").tolist() if not d in d_obs]
         fig.update_xaxes(rangebreaks=[dict(values=d_breaks)])
+        # ５　追加レイアウト設定はここ
         # 相関分析時にy軸の最大最小値の固定化
         if (corr == True) and (add_volume == False):
             fig.update_yaxes(range=[-1, 1], row=2, col=1)
