@@ -130,6 +130,7 @@ class visualization:
         df2,
         start_day=19500101,
         end_day=21001231,
+        is_firstday_open_start=False,
         is_indexing=True,
         is_corr=True,
         corr_span=5,
@@ -137,7 +138,6 @@ class visualization:
         is_add_volume_log=False,
         is_diff=True,
     ):
-        # 引数追加 , start_day, end_day
         """
         visualization.pairchart(df1,df2,スタート日付{"20200101"},エンド日付)
         これで出せるようにしてほしい
@@ -148,6 +148,7 @@ class visualization:
         :param df2:df 株価のdataframe
         :param start_day:int (例20200101) 表示期間の始まりの日
         :param end_day:int(例20200101) 表示期間の終わりの日
+        :param is_firstday_open_start:bool Trueなら初日の初値を基準に騰落率を計算する。初値は期間初日の前日の日付で表示している。
         :param is_indexing:bool Trueなら上段の株価終値を100を基準とした終値指数化に変更
         :param is_corr:bool Trueなら下段に相関分析を表示する
         :param corr_span:int corrの計算期間の変更
@@ -179,20 +180,47 @@ class visualization:
         # 期間範囲指定
         df1 = df1[(df1["date"] >= f"{start_day}") & (df1["date"] <= f"{end_day}")]
         df2 = df2[(df2["date"] >= f"{start_day}") & (df2["date"] <= f"{end_day}")]
+        # 目的の株価をチャート表示するためのtarget_priceカラム作成
+        df1["target_price"] = df1["fix_close"]
+        df2["target_price"] = df2["fix_close"]
+        # 初日初値を基準にtarget_priceを計算
+        if is_firstday_open_start:
+            # 1行目を複製して1行目に追加
+            df1.loc[-1] = df1.iloc[0]
+            df1.index = df1.index + 1
+            df1 = df1.sort_index()
+            # target_priceの1行目を初値に置換
+            df1["target_price"].iloc[0] = df1["fix_open"].iloc[0]
+            df1["fix_volume"].iloc[0] = 0
+            # 初日の日付を期間初日の前日に設定
+            df1["date"].iloc[0] = df1["date"].iloc[0] - pd.Timedelta(days=1)
+            # 1行目を複製して1行目に追加
+            df2.loc[-1] = df2.iloc[0]
+            df2.index = df2.index + 1
+            df2 = df2.sort_index()
+            # target_priceの1行目を初値に置換
+            df2["target_price"].iloc[0] = df2["fix_open"].iloc[0]
+            df2["fix_volume"].iloc[0] = 0
+            # 初日の日付を期間初日の前日に設定
+            df2["date"].iloc[0] = df2["date"].iloc[0] - pd.Timedelta(days=1)
         # 指数化の計算
         if is_indexing:
             df1 = df1.reset_index()
-            df1["fix_close"] = df1["fix_close"] / df1["fix_close"].iloc[0] * 100
+            df1["target_price"] = (
+                df1["target_price"] / df1["target_price"].iloc[0] * 100
+            )
             df2 = df2.reset_index()
-            df2["fix_close"] = df2["fix_close"] / df2["fix_close"].iloc[0] * 100
+            df2["target_price"] = (
+                df2["target_price"] / df2["target_price"].iloc[0] * 100
+            )
         # 差分の作成
         if is_diff:
-            param_diff = df1["fix_close"] - df2["fix_close"]
+            param_diff = df1["target_price"] - df2["target_price"]
             param_name_diff = "差分"
         param_name = ""
         # 相関係数の作成
         if is_corr:
-            param = df1["fix_close"].rolling(corr_span).corr(df2["fix_close"])
+            param = df1["target_price"].rolling(corr_span).corr(df2["target_price"])
             param_name = "相関分析"
         # 出来高にparam変更
         if is_add_volume:
@@ -219,7 +247,7 @@ class visualization:
         fig.add_trace(
             go.Scatter(
                 x=df1["date"],
-                y=df1["fix_close"],
+                y=df1["target_price"],
                 mode="lines",
                 name=f"{code1}",
             ),
@@ -229,7 +257,7 @@ class visualization:
         fig.add_trace(
             go.Scatter(
                 x=df1["date"],
-                y=df2["fix_close"],
+                y=df2["target_price"],
                 mode="lines",
                 name=f"{code2}",
             ),
@@ -352,7 +380,7 @@ class visualization:
         :param is_plot_mean_alpha: int is_plot_meanのplotの濃さ
         :param log_y: bool y軸をlog表示にする
         :param log_y_base: float 対数の底の値
-        :param log_y_linthresh: float 対数スケールを線形スケールに変更する値。0からどこまでを線形スケールにするか範囲を設定。値が小さいほど0付近の動きが大きくなる。
+        :param log_y_linthresh: float 対数から線形スケールに変更する。0からどこまでにするか範囲を設定。値が小さいほど0付近の動きが大きくなる。
         :return: 複数銘柄のチャート
         """
         # プロットの設定
