@@ -428,24 +428,20 @@ class visualization:
                 )
         if is_plot_mean:
             # 全体の騰落率の平均値を求める
-            all_returns = [
-                returns
-                for df in df_list
-                for returns in (df["fix_close"] / df["fix_open"].iloc[0] - 1) * 100
-            ]
-            # 各日の騰落率の平均値を求める
-            mean_daily_returns = [
-                np.mean(
-                    [
-                        all_returns[i]
-                        for i in range(len(all_returns))
-                        if i % day_period == j
-                    ]
-                )
-                for j in range(day_period)
-            ]
-            # 0から始まるようにする
-            mean_daily_returns.insert(0, 0)
+            all_returns = []
+            for df in df_list:
+                returns = ((df["fix_close"] / df["fix_open"].iloc[0] - 1) * 100).values
+                # day_periodの日数に足りない要素数分np.nanを挿入する
+                if len(returns) < day_period:
+                    pad_width = day_period - len(returns)
+                    returns = np.pad(
+                        returns, (0, pad_width), mode="constant", constant_values=np.nan
+                    )
+                all_returns.append(returns)
+            # 各日の騰落率の平均値を求める(np.nanを除いた数値のデータのみで平均値を出す)
+            mean_daily_returns = np.nanmean(all_returns, axis=0)
+            # 初日の0%を追加する
+            mean_daily_returns = np.insert(mean_daily_returns, 0, 0)
             # 全体の騰落率の平均値をプロット
             ax.plot(mean_daily_returns, marker=".", label="Mean Returns", color="red")
         # グラフのラベルとタイトルを設定
