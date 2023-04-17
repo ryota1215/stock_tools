@@ -423,3 +423,17 @@ class db_maker:
                 df.replace('-', np.nan, inplace=True)
                 df.replace('', np.nan, inplace=True)
                 df.to_sql(tabel_name, self.engine, if_exists="append", index=False)
+
+
+if __name__ == "__main__":
+    with open(r"../../../jquants.json") as f:
+        d = json.load(f)
+
+    jquants_api_userinfo = d["user_info"]
+    dict_postgre_info = d["db_info"]
+    print(dict_postgre_info)
+    db = db_maker.db_maker(
+        dict_account_info=jquants_api_userinfo,
+        dict_postgre_info=dict_postgre_info,
+        is_make_tabel=False,
+    )

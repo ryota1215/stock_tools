@@ -133,3 +133,4 @@ dmypy.json
 
 # 共有しないファイル
 imgs/
+client_secret.json
