@@ -6,11 +6,15 @@ import psycopg2
 from sqlalchemy import create_engine
 import requests
 import json
+from stock_tools import google_auth
 
 
 class db_maker:
     def __init__(
-            self, dict_account_info: dict = {}, dict_postgre_info: dict = {}, is_make_tabel: bool = False
+        self,
+        dict_account_info: dict = {},
+        dict_postgre_info: dict = {},
+        is_make_tabel: bool = False,
     ):
         """
         dict_account_info : jquantsのmailaddressとpassword {"mailaddress":"...","password":"..."}
@@ -75,11 +79,14 @@ class db_maker:
         """
         アクセストークンを取得
         """
-        r_post = requests.post("https://api.jquants.com/v1/token/auth_user",
-                               data=json.dumps(self.dict_account_info))
+        r_post = requests.post(
+            "https://api.jquants.com/v1/token/auth_user",
+            data=json.dumps(self.dict_account_info),
+        )
         ref_token = r_post.json()["refreshToken"]
         r_post = requests.post(
-            f"https://api.jquants.com/v1/token/auth_refresh?refreshtoken={ref_token}")
+            f"https://api.jquants.com/v1/token/auth_refresh?refreshtoken={ref_token}"
+        )
         access_token = r_post.json()["idToken"]
 
         return access_token
@@ -90,18 +97,43 @@ class db_maker:
         """
         tabel_name = "listed"
 
-        # apiでデータ取得
-        headers = {'Authorization': 'Bearer {}'.format(self.access_token)}
-        r = requests.get("https://api.jquants.com/v1/listed/info", headers=headers)
-        data = r.json()
-
-        assert "info" in data.keys(), "APIError listed"
-        df_listed = pd.DataFrame(data["info"])
-
         if self.is_make_tabel:
+            dt_origin = "20080507"
+            dt_today = datetime.datetime.strftime(
+                datetime.date.today(), format="%Y%m%d"
+            )
+            dt_range = pd.date_range(dt_origin, dt_today)
+
+            tabel_name = "listed"
+
+            datas = []
+            for dt in tqdm(dt_range):
+                dt = datetime.datetime.strftime(dt, format="%Y%m%d")
+                # apiでデータ取得
+                headers = {"Authorization": "Bearer {}".format(self.access_token)}
+                r = requests.get(
+                    f"https://api.jquants.com/v1/listed/info?date={dt}", headers=headers
+                )
+                data = r.json()
+
+                assert "info" in data.keys(), "APIError listed"
+
+                # assert "info" in data.keys(), "APIError listed"
+                datas.append(pd.DataFrame(data["info"]))
+
             # DB作成
+            df_listed = pd.concat(datas)
             df_listed.to_sql(tabel_name, self.engine, if_exists="replace", index=False)
+
         else:
+            # apiでデータ取得
+            headers = {"Authorization": "Bearer {}".format(self.access_token)}
+            r = requests.get("https://api.jquants.com/v1/listed/info", headers=headers)
+            data = r.json()
+
+            assert "info" in data.keys(), "APIError listed"
+            df_listed = pd.DataFrame(data["info"])
+
             # DB更新
             df_listed.to_sql(tabel_name, self.engine, if_exists="append", index=False)
 
@@ -109,7 +141,7 @@ class db_maker:
         """
         銘柄コードリスト取得
         """
-        df_listed = pd.read_sql(sql='SELECT * FROM listed;', con=self.connection)
+        df_listed = pd.read_sql(sql="SELECT * FROM listed;", con=self.connection)
         list_code = np.unique(df_listed["Code"])
         return list_code
 
@@ -126,17 +158,21 @@ class db_maker:
         else:
             self.cursor.execute(f'SELECT MAX("Date") FROM {tabel_name}')
             dt_origin = self.cursor.fetchone()[0]
-        dt_today = datetime.datetime.strftime(datetime.datetime.today().date(), "%Y%m%d")
+        dt_today = datetime.datetime.strftime(
+            datetime.datetime.today().date(), "%Y%m%d"
+        )
 
         cnt = 0
         for code in tqdm(list_code):
             # apiでデータ取得
-            headers = {'Authorization': 'Bearer {}'.format(self.access_token)}
+            headers = {"Authorization": "Bearer {}".format(self.access_token)}
             r = requests.get(
-                f"https://api.jquants.com/v1/prices/daily_quotes?code={code}&from={dt_origin}&to={dt_today}", headers=headers
+                f"https://api.jquants.com/v1/prices/daily_quotes?code={code}&from={dt_origin}&to={dt_today}",
+                headers=headers,
             )
             data = r.json()
-            assert "daily_quotes" in data.keys(
+            assert (
+                "daily_quotes" in data.keys()
             ), f"APIError stockprice code : {code} dt_start : {dt_origin}"
             df = pd.DataFrame(data["daily_quotes"])
 
@@ -157,27 +193,34 @@ class db_maker:
         if self.is_make_tabel:
             dt_origin = "20080116"
             list_market = [
-                "TSE1st", "TSE2nd", "TSEMothers", "TSEJASDAQ",
-                "TSEPrime", "TSEStandard", "TSEGrowth", "TokyoNagoya"
+                "TSE1st",
+                "TSE2nd",
+                "TSEMothers",
+                "TSEJASDAQ",
+                "TSEPrime",
+                "TSEStandard",
+                "TSEGrowth",
+                "TokyoNagoya",
             ]
         else:
             self.cursor.execute(f'SELECT MAX("PublishedDate") FROM {tabel_name}')
             dt_origin = self.cursor.fetchone()[0]
-            list_market = [
-                "TSEPrime", "TSEStandard", "TSEGrowth", "TokyoNagoya"
-            ]
-        dt_today = datetime.datetime.strftime(datetime.datetime.today().date(), "%Y%m%d")
+            list_market = ["TSEPrime", "TSEStandard", "TSEGrowth", "TokyoNagoya"]
+        dt_today = datetime.datetime.strftime(
+            datetime.datetime.today().date(), "%Y%m%d"
+        )
 
         cnt = 0
         for market in tqdm(list_market):
             # apiでデータ取得
-            headers = {'Authorization': 'Bearer {}'.format(self.access_token)}
+            headers = {"Authorization": "Bearer {}".format(self.access_token)}
             r = requests.get(
                 f"https://api.jquants.com/v1/markets/trades_spec?section={market}&from={dt_origin}&to={dt_today}",
-                headers=headers
+                headers=headers,
             )
             data = r.json()
-            assert "trades_spec" in data.keys(
+            assert (
+                "trades_spec" in data.keys()
             ), f"APIError trades_spec market : {market} dt_start : {dt_origin}"
             df = pd.DataFrame(data["trades_spec"])
 
@@ -202,17 +245,21 @@ class db_maker:
         else:
             self.cursor.execute(f'SELECT MAX("Date") FROM {tabel_name}')
             dt_origin = self.cursor.fetchone()[0]
-        dt_today = datetime.datetime.strftime(datetime.datetime.today().date(), "%Y%m%d")
+        dt_today = datetime.datetime.strftime(
+            datetime.datetime.today().date(), "%Y%m%d"
+        )
 
         cnt = 0
         for code in tqdm(list_code):
             # apiでデータ取得
-            headers = {'Authorization': 'Bearer {}'.format(self.access_token)}
+            headers = {"Authorization": "Bearer {}".format(self.access_token)}
             r = requests.get(
-                f"https://api.jquants.com/v1/markets/weekly_margin_interest?code={code}&from={dt_origin}&to={dt_today}", headers=headers
+                f"https://api.jquants.com/v1/markets/weekly_margin_interest?code={code}&from={dt_origin}&to={dt_today}",
+                headers=headers,
             )
             data = r.json()
-            assert "weekly_margin_interest" in data.keys(
+            assert (
+                "weekly_margin_interest" in data.keys()
             ), f"APIError weekly_margin_interest code : {code} dt_start : {dt_origin}"
             df = pd.DataFrame(data["weekly_margin_interest"])
 
@@ -228,11 +275,42 @@ class db_maker:
         """
         業種別空売り比率
         """
-        list_sec = ['0050', '9999', '2050', '3500', '1050', '9050', '8050', '3600',
-                    '3550', '5250', '3050', '3250', '5050', '7200', '6100', '6050',
-                    '3800', '3200', '3100', '3650', '3400', '7100', '3700', '3300',
-                    '3150', '3750', '3350', '3450', '7050', '7150', '5200', '5100',
-                    '5150', '4050']
+        list_sec = [
+            "0050",
+            "9999",
+            "2050",
+            "3500",
+            "1050",
+            "9050",
+            "8050",
+            "3600",
+            "3550",
+            "5250",
+            "3050",
+            "3250",
+            "5050",
+            "7200",
+            "6100",
+            "6050",
+            "3800",
+            "3200",
+            "3100",
+            "3650",
+            "3400",
+            "7100",
+            "3700",
+            "3300",
+            "3150",
+            "3750",
+            "3350",
+            "3450",
+            "7050",
+            "7150",
+            "5200",
+            "5100",
+            "5150",
+            "4050",
+        ]
         tabel_name = "short_selling"
 
         # DB作成時には、指定日~今日まで 更新時には、DBの最終日~今日まで
@@ -241,17 +319,21 @@ class db_maker:
         else:
             self.cursor.execute(f'SELECT MAX("Date") FROM {tabel_name}')
             dt_origin = self.cursor.fetchone()[0]
-        dt_today = datetime.datetime.strftime(datetime.datetime.today().date(), "%Y%m%d")
+        dt_today = datetime.datetime.strftime(
+            datetime.datetime.today().date(), "%Y%m%d"
+        )
 
         cnt = 0
         for sec in tqdm(list_sec):
             # apiでデータ取得
-            headers = {'Authorization': 'Bearer {}'.format(self.access_token)}
+            headers = {"Authorization": "Bearer {}".format(self.access_token)}
             r = requests.get(
-                f"https://api.jquants.com/v1/markets/short_selling?sector33code={sec}&from={dt_origin}&to={dt_today}", headers=headers
+                f"https://api.jquants.com/v1/markets/short_selling?sector33code={sec}&from={dt_origin}&to={dt_today}",
+                headers=headers,
             )
             data = r.json()
-            assert "short_selling" in data.keys(
+            assert (
+                "short_selling" in data.keys()
             ), f"APIError short_selling sec : {sec} dt_start : {dt_origin}"
             df = pd.DataFrame(data["short_selling"])
 
@@ -276,17 +358,21 @@ class db_maker:
         else:
             self.cursor.execute(f'SELECT MAX("Date") FROM {tabel_name}')
             dt_origin = self.cursor.fetchone()[0]
-        dt_today = datetime.datetime.strftime(datetime.datetime.today().date(), "%Y%m%d")
+        dt_today = datetime.datetime.strftime(
+            datetime.datetime.today().date(), "%Y%m%d"
+        )
 
         cnt = 0
         for code in tqdm(list_code):
             # apiでデータ取得
-            headers = {'Authorization': 'Bearer {}'.format(self.access_token)}
+            headers = {"Authorization": "Bearer {}".format(self.access_token)}
             r = requests.get(
-                f"https://api.jquants.com/v1/markets/breakdown?code={code}&from={dt_origin}&to={dt_today}", headers=headers
+                f"https://api.jquants.com/v1/markets/breakdown?code={code}&from={dt_origin}&to={dt_today}",
+                headers=headers,
             )
             data = r.json()
-            assert "breakdown" in data.keys(
+            assert (
+                "breakdown" in data.keys()
             ), f"APIError breakdown code : {code} dt_start : {dt_origin}"
             df = pd.DataFrame(data["breakdown"])
 
@@ -315,13 +401,13 @@ class db_maker:
         cnt = 0
         for code in tqdm(list_code):
             # apiでデータ取得
-            headers = {'Authorization': 'Bearer {}'.format(self.access_token)}
+            headers = {"Authorization": "Bearer {}".format(self.access_token)}
             r = requests.get(
-                f"https://api.jquants.com/v1/fins/statements?code={code}", headers=headers
+                f"https://api.jquants.com/v1/fins/statements?code={code}",
+                headers=headers,
             )
             data = r.json()
-            assert "statements" in data.keys(
-            ), f"APIError statements code : {code} "
+            assert "statements" in data.keys(), f"APIError statements code : {code} "
             df = pd.DataFrame(data["statements"])
             if df.empty:
                 continue
@@ -352,20 +438,19 @@ class db_maker:
         cnt = 0
         for code in tqdm(list_code):
             # apiでデータ取得
-            headers = {'Authorization': 'Bearer {}'.format(self.access_token)}
+            headers = {"Authorization": "Bearer {}".format(self.access_token)}
             r = requests.get(
                 f"https://api.jquants.com/v1/fins/dividend?code={code}", headers=headers
             )
             data = r.json()
-            assert "dividend" in data.keys(
-            ), f"APIError dividend code : {code} "
+            assert "dividend" in data.keys(), f"APIError dividend code : {code} "
             df = pd.DataFrame(data["dividend"])
             if df.empty:
                 continue
 
             if self.is_make_tabel & (cnt == 0):
                 # DB作成
-                df.replace('-', np.nan, inplace=True)
+                df.replace("-", np.nan, inplace=True)
                 df.to_sql(tabel_name, self.engine, if_exists="replace", index=False)
                 cnt += 1
             else:
@@ -374,7 +459,7 @@ class db_maker:
                     df = df[df["AnnouncementDate"] > dt_origin]
                     if df.empty:
                         continue
-                df.replace('-', np.nan, inplace=True)
+                df.replace("-", np.nan, inplace=True)
                 df.to_sql(tabel_name, self.engine, if_exists="append", index=False)
 
     def db_option(self):
@@ -389,39 +474,45 @@ class db_maker:
         else:
             self.cursor.execute(f'SELECT MAX("Date") FROM {tabel_name}')
             dt_origin = self.cursor.fetchone()[0]
-        dt_today = datetime.datetime.strftime(datetime.datetime.today().date(), "%Y%m%d")
+        dt_today = datetime.datetime.strftime(
+            datetime.datetime.today().date(), "%Y%m%d"
+        )
         # 東証の営業日を取得する
-        headers = {'Authorization': 'Bearer {}'.format(self.access_token)}
+        headers = {"Authorization": "Bearer {}".format(self.access_token)}
         r = requests.get(
-            f"https://api.jquants.com/v1/prices/daily_quotes?code=72030&from={dt_origin}&to={dt_today}", headers=headers
+            f"https://api.jquants.com/v1/prices/daily_quotes?code=72030&from={dt_origin}&to={dt_today}",
+            headers=headers,
         )
         data = r.json()
-        assert "daily_quotes" in data.keys(
+        assert (
+            "daily_quotes" in data.keys()
         ), f"APIError stockprice code : 72030 dt_start : {dt_origin}"
         list_date = pd.DataFrame(data["daily_quotes"])["Date"]
 
         cnt = 0
         for dt in tqdm(list_date):
             # apiでデータ取得
-            headers = {'Authorization': 'Bearer {}'.format(self.access_token)}
+            headers = {"Authorization": "Bearer {}".format(self.access_token)}
             r = requests.get(
-                f"https://api.jquants.com/v1/option/index_option?date={dt}", headers=headers
+                f"https://api.jquants.com/v1/option/index_option?date={dt}",
+                headers=headers,
             )
             data = r.json()
-            assert "index_option" in data.keys(
+            assert (
+                "index_option" in data.keys()
             ), f"APIError index_option dt_start : {dt}"
             df = pd.DataFrame(data["index_option"])
 
             if self.is_make_tabel & (cnt == 0):
                 # DB作成
-                df.replace('-', np.nan, inplace=True)
-                df.replace('', np.nan, inplace=True)
+                df.replace("-", np.nan, inplace=True)
+                df.replace("", np.nan, inplace=True)
                 df.to_sql(tabel_name, self.engine, if_exists="replace", index=False)
                 cnt += 1
             else:
                 # DB更新
-                df.replace('-', np.nan, inplace=True)
-                df.replace('', np.nan, inplace=True)
+                df.replace("-", np.nan, inplace=True)
+                df.replace("", np.nan, inplace=True)
                 df.to_sql(tabel_name, self.engine, if_exists="append", index=False)
 
 
@@ -430,10 +521,13 @@ if __name__ == "__main__":
         d = json.load(f)
 
     jquants_api_userinfo = d["user_info"]
-    dict_postgre_info = d["db_info"]
-    print(dict_postgre_info)
-    db = db_maker.db_maker(
+    dict_postgre_info = d["db_info02"]  # db_info
+    db = db_maker(
         dict_account_info=jquants_api_userinfo,
         dict_postgre_info=dict_postgre_info,
-        is_make_tabel=False,
+        is_make_tabel=True,
     )
+    db.db_update()
+    db.cursor.close()
+    db.connection.close()
+    google_auth.send_message("Daily update Done")

@@ -134,3 +134,9 @@ dmypy.json
 # 共有しないファイル
 imgs/
 client_secret.json
+saved_credentials.json
+settings.yaml
+google_auto.py
+drive_uploader.py
+labo_future.py
+*.bat

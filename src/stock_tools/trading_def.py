@@ -11,6 +11,8 @@ import locale
 import warnings
 import datetime
 import jpholiday
+from dateutil.relativedelta import relativedelta, FR
+from dateutil.rrule import rrule, MONTHLY
 from logging import getLogger
 
 logger = getLogger(__name__)
@@ -194,8 +196,25 @@ def is_sq(date):
     return sq_date == date
 
 
+def list_sq(dt_start=datetime.date(2000, 1, 1)):
+    # 今日の日付を取得
+    today = datetime.date.today()
+    t_delta = today - dt_start + datetime.timedelta(days=365)
+
+    # 1年間のSQ日を計算
+    sq_dates = list(
+        rrule(
+            MONTHLY,
+            dtstart=dt_start,
+            until=dt_start + relativedelta(days=t_delta.days),
+            byweekday=FR(2),
+        )
+    )
+    return sq_dates
+
+
 def get_day_of_nth_dow(year, month, nth, dow):
-    '''dow: Monday(0) - Sunday(6)'''
+    """dow: Monday(0) - Sunday(6)"""
     if nth < 1 or dow < 0 or dow > 6:
         return None
 
@@ -245,20 +264,27 @@ def make_sector_index(dfs_code, dict_sector_codes, lst_sector):
             for code in dict_sector_codes[target_sector]
         }
         df_market_cap = pd.concat(dict_market_cap, axis=1)
-        df_market_cap = df_market_cap.fillna(0.0000000000000000000000000000000000000000000000001)
+        df_market_cap = df_market_cap.fillna(
+            0.0000000000000000000000000000000000000000000000001
+        )
         # セクター内の各銘柄の騰落率を取得
         dict_oc_change = {
             code: dfs_code[code].set_index("Date")["AdjustmentClose"].rename(code)
-            / dfs_code[code]["AdjustmentOpen"].values - 1
+            / dfs_code[code]["AdjustmentOpen"].values
+            - 1
             for code in dict_sector_codes[target_sector]
         }
         dict_cc_change = {
-            code: dfs_code[code].set_index("Date")["AdjustmentClose"].rename(code).pct_change()
+            code: dfs_code[code]
+            .set_index("Date")["AdjustmentClose"]
+            .rename(code)
+            .pct_change()
             for code in dict_sector_codes[target_sector]
         }
         dict_gap = {
-            code: dfs_code[code].set_index("Date")["AdjustmentOpen"].rename(code) /
-            dfs_code[code]["AdjustmentClose"].shift().values - 1
+            code: dfs_code[code].set_index("Date")["AdjustmentOpen"].rename(code)
+            / dfs_code[code]["AdjustmentClose"].shift().values
+            - 1
             for code in dict_sector_codes[target_sector]
         }
 
@@ -286,35 +312,45 @@ def make_sector_index(dfs_code, dict_sector_codes, lst_sector):
         )
         lst_term_oc = []
         for term in [3, 5, 10, 20, 60, 120]:
-            lst_term_oc.append(pd.DataFrame(
-                np.average(
-                    pd.DataFrame(
-                        [
-                            calc_term_oc(code, dfs_code, term, max_len)
-                            for code in dict_sector_codes[target_sector]
-                        ]
-                    ).T,
-                    axis=1,
-                    weights=df_market_cap,
-                ),
-                index=pd.to_datetime(df_oc_change.index),
-                columns=[f"sector_term{term}_oc"],
-            ))
+            lst_term_oc.append(
+                pd.DataFrame(
+                    np.average(
+                        pd.DataFrame(
+                            [
+                                calc_term_oc(code, dfs_code, term, max_len)
+                                for code in dict_sector_codes[target_sector]
+                            ]
+                        ).T,
+                        axis=1,
+                        weights=df_market_cap,
+                    ),
+                    index=pd.to_datetime(df_oc_change.index),
+                    columns=[f"sector_term{term}_oc"],
+                )
+            )
         df_terms_oc = pd.concat(lst_term_oc, axis=1)
 
-        df_sector_index = pd.merge(df_sector_oc, df_sector_cc, left_index=True, right_index=True)
-        df_sector_index = pd.merge(df_sector_index, df_sector_gap,
-                                   left_index=True, right_index=True)
-        df_sector_index = pd.merge(df_sector_index, df_terms_oc, left_index=True, right_index=True)
-        df_sector_index.columns = [c.replace("sector", target_sector)
-                                   for c in df_sector_index.columns]
+        df_sector_index = pd.merge(
+            df_sector_oc, df_sector_cc, left_index=True, right_index=True
+        )
+        df_sector_index = pd.merge(
+            df_sector_index, df_sector_gap, left_index=True, right_index=True
+        )
+        df_sector_index = pd.merge(
+            df_sector_index, df_terms_oc, left_index=True, right_index=True
+        )
+        df_sector_index.columns = [
+            c.replace("sector", target_sector) for c in df_sector_index.columns
+        ]
         df_sector_indexs = pd.concat([df_sector_indexs, df_sector_index], axis=1)
     return df_sector_indexs
 
 
 def calc_term_oc(code, dfs_code, term, max_len):
     try:
-        term_close = sliding_window_view(dfs_code[code]["AdjustmentClose"].values, term)[:, -1]
+        term_close = sliding_window_view(
+            dfs_code[code]["AdjustmentClose"].values, term
+        )[:, -1]
     except ValueError:
         return np.arange(max_len) * 0
     term_open = sliding_window_view(dfs_code[code]["AdjustmentOpen"].values, term)[:, 0]
@@ -361,14 +397,19 @@ def add_market_cap(df):
     """
     df_code = df.set_index("Date")
     df_adjustmentfactor = df_code["AdjustmentFactor"][df_code["AdjustmentFactor"] != 1]
-    df_shares = df_code["NumberOfIssuedAndOutstandingSharesAtTheEndOfFiscalYearIncludingTreasuryStock"]
+    df_shares = df_code[
+        "NumberOfIssuedAndOutstandingSharesAtTheEndOfFiscalYearIncludingTreasuryStock"
+    ]
     df_shares_pct = df_shares.pct_change().dropna()
-    df_shares_pct_select = df_shares_pct[(df_shares_pct >= 0.03)
-                                         | (df_shares_pct <= -0.03)].dropna()
+    df_shares_pct_select = df_shares_pct[
+        (df_shares_pct >= 0.03) | (df_shares_pct <= -0.03)
+    ].dropna()
     for date, val in df_adjustmentfactor.iteritems():
         try:
             target = df_shares_pct_select.loc[
-                date - datetime.timedelta(days=120):date + datetime.timedelta(days=120)
+                date
+                - datetime.timedelta(days=120) : date
+                + datetime.timedelta(days=120)
             ]
             target_date = target.index[np.argmin(abs(target - val))]
         except Exception as e:

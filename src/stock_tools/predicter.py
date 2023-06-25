@@ -1,6 +1,12 @@
 import numpy as np
 import pandas as pd
-from sklearn.linear_model import LinearRegression, RANSACRegressor, Ridge, Lasso, LogisticRegression
+from sklearn.linear_model import (
+    LinearRegression,
+    RANSACRegressor,
+    Ridge,
+    Lasso,
+    LogisticRegression,
+)
 import lightgbm as lgb
 from sklearn.preprocessing import StandardScaler, MinMaxScaler
 from typing import Union
@@ -21,27 +27,32 @@ def ransac_plot(model, x, y, pred_y):
     inlier = model.inlier_mask_
     outlier = np.logical_not(inlier)
 
-    plt.scatter(x[inlier], y[inlier], c='blue',
-                edgecolor='black', s=30, marker='o', label='正常値'
-                )
+    plt.scatter(
+        x[inlier], y[inlier], c="blue", edgecolor="black", s=30, marker="o", label="正常値"
+    )
 
-    plt.scatter(x[outlier], y[outlier], c='green',
-                edgecolor='black', s=30, marker='o', label='外れ値'
-                )
-    plt.plot(x.values,
-             pred_y,
-             color='red',
-             lw=3,
-             label="回帰直線",
-             )
+    plt.scatter(
+        x[outlier],
+        y[outlier],
+        c="green",
+        edgecolor="black",
+        s=30,
+        marker="o",
+        label="外れ値",
+    )
+    plt.plot(
+        x.values,
+        pred_y,
+        color="red",
+        lw=3,
+        label="回帰直線",
+    )
 
     plt.legend()
     plt.show()
 
 
-def base_params(
-    model_name: str = "linear"
-):
+def base_params(model_name: str = "linear"):
     """
     model_name : linear,ransac,ridge,lasso,lgb,lgb_binary,logistic
     scaler_name : ss,mm,ssmm,mmss
@@ -60,17 +71,17 @@ def base_params(
             "stop_score": np.inf,
             "stop_probability": 0.99,
             "loss": "absolute_error",
-            "random_state": 1
+            "random_state": 1,
         }
     elif model_name == "ridge" or model_name == "lasso":
         params = {"alpha": 1.0}
     elif model_name == "lgb":
         params = params = {
-            'objective': 'regression',
-            'num_leaves': 10,
-            'lambda_l1': 0.1,
-            'lambda_l2': 0.1,
-            'metric': 'rmse',
+            "objective": "regression",
+            "num_leaves": 10,
+            "lambda_l1": 0.1,
+            "lambda_l2": 0.1,
+            "metric": "rmse",
             "learning_rate": 0.01,
             "extra_trees": True,
             "colsample_bytree": 0.1,
@@ -80,38 +91,34 @@ def base_params(
     elif model_name == "lgb_binary":
         params = {
             "objective": "binary",
-            'num_leaves': 10,
-            'lambda_l1': 0.1,
-            'lambda_l2': 0.1,
-            'metric': 'binary_logloss',
+            "num_leaves": 10,
+            "lambda_l1": 0.1,
+            "lambda_l2": 0.1,
+            "metric": "binary_logloss",
             "learning_rate": 0.01,
             "extra_trees": True,
             "colsample_bytree": 0.1,
             "random_state": 1,
         }
     elif model_name == "logistic":
-        params = {
-            "penalty": "l1",
-            "C": 1.,
-            "random_state": 1
-        }
+        params = {"penalty": "l1", "C": 1.0, "random_state": 1}
     return params
 
 
 def creat_model(
-        model_name: str = "linear",
-        params: dict = {},
-        num_round: int = 100,
-        early_stopping_rounds: int = 20,
-        verbose_eval: bool = False,
-        is_select_features: bool = False,
-        k: int = 10,
-        scaler_name: str = None,
-        categorical_feature: list = [],
-        train_x: Union[pd.Series, pd.DataFrame] = None,
-        train_y: Union[pd.Series, pd.DataFrame] = None,
-        valid_x: Union[pd.Series, pd.DataFrame] = None,
-        valid_y: Union[pd.Series, pd.DataFrame] = None,
+    model_name: str = "linear",
+    params: dict = {},
+    num_round: int = 100,
+    early_stopping_rounds: int = 20,
+    verbose_eval: bool = False,
+    is_select_features: bool = False,
+    k: int = 10,
+    scaler_name: str = None,
+    categorical_feature: list = [],
+    train_x: Union[pd.Series, pd.DataFrame] = None,
+    train_y: Union[pd.Series, pd.DataFrame] = None,
+    valid_x: Union[pd.Series, pd.DataFrame] = None,
+    valid_y: Union[pd.Series, pd.DataFrame] = None,
 ):
     """
     model_name : linear,ransac,ridge,lasso,lgb,lgb_binary,logistic
@@ -182,34 +189,45 @@ def creat_model(
             if "binary" not in model_name and "logistic" not in model_name:
                 model = lgb.LGBMRegressor(**params)
                 select_cols = feature_selection(
-                    model=model, train_x=train_x, train_y=train_y, n_features_to_select=k
+                    model=model,
+                    train_x=train_x,
+                    train_y=train_y,
+                    n_features_to_select=k,
                 )
                 train_x = train_x[select_cols]
                 valid_x = valid_x[select_cols]
             else:
                 model = lgb.LGBMClassifier(**params)
                 select_cols = feature_selection(
-                    model=model, train_x=train_x, train_y=train_y, n_features_to_select=k
+                    model=model,
+                    train_x=train_x,
+                    train_y=train_y,
+                    n_features_to_select=k,
                 )
                 train_x = train_x[select_cols]
                 valid_x = valid_x[select_cols]
 
         lgb_train = lgb.Dataset(train_x, train_y)
         lgb_valid = lgb.Dataset(valid_x, valid_y)
-        model = lgb.train(params, lgb_train,
-                          num_boost_round=num_round,
-                          valid_names=['train', 'valid'],
-                          valid_sets=[lgb_train, lgb_valid],
-                          early_stopping_rounds=early_stopping_rounds,
-                          verbose_eval=verbose_eval,
-                          categorical_feature=categorical_feature
-                          )
+        model = lgb.train(
+            params,
+            lgb_train,
+            num_boost_round=num_round,
+            valid_names=["train", "valid"],
+            valid_sets=[lgb_train, lgb_valid],
+            early_stopping_rounds=early_stopping_rounds,
+            verbose_eval=verbose_eval,
+            categorical_feature=categorical_feature,
+        )
 
     else:
         if is_select_features:
             model = model.fit(train_x, train_y)
             select_cols = feature_selection(
-                model=model.estimator_, train_x=train_x, train_y=train_y, n_features_to_select=k
+                model=model.estimator_,
+                train_x=train_x,
+                train_y=train_y,
+                n_features_to_select=k,
             )
             train_x = train_x[select_cols]
         if len(train_x.shape) == 1:
@@ -272,8 +290,10 @@ def scale(model_name, scaler_name, train_x, train_y, valid_x, valid_y):
             scale_x = scaler_model_x.fit_transform(train_x)
             scale_y = scaler_model_y.fit_transform(train_y.values.reshape(-1, 1))
         return {
-            "scaler_x": scaler_model_x, "scaler_y": scaler_model_y,
-            "scale_x": scale_x, "scale_y": scale_y
+            "scaler_x": scaler_model_x,
+            "scaler_y": scaler_model_y,
+            "scale_x": scale_x,
+            "scale_y": scale_y,
         }
 
     elif scaler_name == "ssmm" or scaler_name == "mmss":
@@ -294,7 +314,12 @@ def scale(model_name, scaler_name, train_x, train_y, valid_x, valid_y):
             scale_x = scaler_model_x2.fit_transform(scale_x)
             scale_y = scaler_model_y1.fit_transform(train_y.values.reshape(-1, 1))
             scale_y = scaler_model_y2.fit_transform(scale_y)
-        return {"scaler_x": [scaler_model_x1, scaler_model_x2], "scaler_y": [scaler_model_y1, scaler_model_y2], "scale_x": scale_x, "scale_y": scale_y}
+        return {
+            "scaler_x": [scaler_model_x1, scaler_model_x2],
+            "scaler_y": [scaler_model_y1, scaler_model_y2],
+            "scale_x": scale_x,
+            "scale_y": scale_y,
+        }
 
 
 def feature_selection(model, train_x, train_y, n_features_to_select=10):
