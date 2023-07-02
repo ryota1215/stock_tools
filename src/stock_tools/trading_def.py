@@ -1,5 +1,6 @@
 # ライブラリー
 import pandas as pd
+import pandas_market_calendars as mcal
 import numpy as np
 from numpy.lib.stride_tricks import sliding_window_view
 import matplotlib.pyplot as plt
@@ -429,3 +430,41 @@ def add_market_cap(df):
     df_code["market_cap"] = df_code["StockShares_fixed"] * df_code["Close"]
     df_code = df_code.reset_index()
     return df_code
+
+
+def add_firstday_and_lastday_in_month(df, calendar="JPX"):
+    df = df.copy()
+    """取引所の営業日基準で月初の月末か否かの列を追加する"""
+
+    def get_business_days_in_month(date, calendar="JPX"):
+        if type(date) != pd.Timestamp:
+            date = pd.to_datetime(date)
+        # 取引所のカレンダー取得
+        market_calendar = mcal.get_calendar(calendar)
+        # 入力された日付の月の最初の日と最後の日を取得
+        first_day = date.replace(day=1)
+        last_day = (first_day + pd.DateOffset(months=1)) - pd.DateOffset(days=1)
+        # その月の営業日を取得
+        business_days = market_calendar.valid_days(
+            start_date=first_day, end_date=last_day
+        )
+        return business_days
+
+    # Get unique months from df_date
+    unique_months = df.index.to_period("M").unique()
+
+    # Get the business days for each month
+    business_days_dict = {
+        month: get_business_days_in_month(month.to_timestamp(), calendar)
+        for month in unique_months
+    }
+
+    # Determine if each date is the first or last business day of the month
+    df["is_firstday"] = df.index.map(
+        lambda x: x.date() == business_days_dict[x.to_period("M")].min()
+    )
+    df["is_lastday"] = df.index.map(
+        lambda x: x.date() == business_days_dict[x.to_period("M")].max()
+    )
+
+    return df

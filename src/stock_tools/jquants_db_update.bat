@@ -6,3 +6,4 @@ cd C:\Users\ryota\sys_trading\stock_tools\src\stock_tools
 python db_maker.py
 python drive_uploader.py
 python labo_future.py
+pause
